@@ -6,3 +6,5 @@ media/
 staticfiles/
 .env
 .DS_Store
+.venv
+kyrauga-env
