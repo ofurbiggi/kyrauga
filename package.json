@@ -2,6 +2,9 @@
   "name": "kyrauga",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "build:css": "postcss home/static/css/tailwind.css -o home/static/css/tailwind-built.css",
     "watch:css": "postcss home/static/css/tailwind.css -o home/static/css/tailwind-built.css --watch",
