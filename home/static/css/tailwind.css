@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional custom theme and utilities */
+
+/* Example: keep existing hero styles via a class */
+.hero-bg {
+  @apply absolute inset-0 w-full h-full bg-cover bg-center;
+}

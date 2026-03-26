@@ -1,0 +1,19 @@
+{
+  "name": "kyrauga",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "build:css": "postcss home/static/css/tailwind.css -o home/static/css/tailwind-built.css",
+    "watch:css": "postcss home/static/css/tailwind.css -o home/static/css/tailwind-built.css --watch",
+    "build:sass": "sass home/static/css/kyrauga.sass home/static/css/kyrauga.css --no-source-map"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.36",
+    "postcss-cli": "^10.1.0",
+    "tailwindcss": "^3.4.3"
+  }
+}
