@@ -6,7 +6,7 @@
   font-style: normal;
 }
 .front-content {
-  position: fixed;
+  position: relative;
   top: 0;
   left: 0;
   width: 100vw;
