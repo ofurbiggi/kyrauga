@@ -7,9 +7,220 @@
 {% block content %}
 
 
-<div class="front-content">
-    <div class="title">Kýrauga</div>
-    <div class="gradient-overlay-from-bottom"></div>
-</div>
-<!-- <div class="flex h-24"></div> -->
+<main class="kyrauga-map-page">
+    <section class="map-shell" aria-label="Interactive project map">
+        <div class="map-viewport" id="mapViewport">
+            <div class="map-layer" id="mapLayer">
+                <div class="map-background" aria-hidden="true"></div>
+
+                <h1 class="site-title">Kýrauga</h1>
+
+                <a class="map-marker" href="/blog/" style="left: 23%; top: 88%;">
+                    <span class="map-marker__dot" aria-hidden="true"></span>
+                    <span class="map-marker__label">Photo blog</span>
+                </a>
+
+                <a class="map-marker" href="/maps/" style="left: 58%; top: 30%;">
+                    <span class="map-marker__dot" aria-hidden="true"></span>
+                    <span class="map-marker__label">Mapping experiments</span>
+                </a>
+
+                <a class="map-marker" href="/tools/" style="left: 73%; top: 35%;">
+                    <span class="map-marker__dot" aria-hidden="true"></span>
+                    <span class="map-marker__label">Journalist tools</span>
+                </a>
+
+                <a class="map-marker" href="/about/" style="left: 32%; top: 28%;">
+                    <span class="map-marker__dot" aria-hidden="true"></span>
+                    <span class="map-marker__label">Um Kýrauga</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <button class="map-helper-toggle" id="mapHelperToggle" type="button" aria-expanded="false" aria-controls="mapFallbackNav">
+        <span class="map-helper-toggle__icon map-helper-toggle__icon--compass" aria-hidden="true">✦</span>
+        <span class="map-helper-toggle__label">Dragðu kortið</span>
+        <span class="map-helper-toggle__icon map-helper-toggle__icon--menu" aria-hidden="true">☰</span>
+    </button>
+
+    <nav class="map-fallback-nav" id="mapFallbackNav" aria-label="Project links">
+        <ul>
+            <li><a href="/blog/">Photo blog</a></li>
+            <li><a href="/maps/">Mapping experiments</a></li>
+            <li><a href="/tools/">Journalist tools</a></li>
+            <li><a href="/about/">Um Kýrauga</a></li>
+        </ul>
+    </nav>
+</main>
+<script>
+    document.documentElement.classList.add("js");
+    (function () {
+        var viewport = document.getElementById("mapViewport");
+        var layer = document.getElementById("mapLayer");
+
+        if (!viewport || !layer) return;
+
+        var markers = Array.prototype.slice.call(
+            layer.querySelectorAll(".map-marker")
+        );
+
+        var state = {
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            currentX: 0,
+            currentY: 0,
+            initialX: 0,
+            initialY: 0
+        };
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function getViewportSize() {
+            return {
+                width: viewport.clientWidth,
+                height: viewport.clientHeight
+            };
+        }
+
+        function getLayerSize() {
+            return {
+                width: layer.offsetWidth,
+                height: layer.offsetHeight
+            };
+        }
+
+        function getBounds() {
+            var viewportSize = getViewportSize();
+            var layerSize = getLayerSize();
+
+            var minX = Math.min(0, viewportSize.width - layerSize.width);
+            var maxX = 0;
+            var minY = Math.min(0, viewportSize.height - layerSize.height);
+            var maxY = 0;
+
+            return {
+                minX: minX,
+                maxX: maxX,
+                minY: minY,
+                maxY: maxY
+            };
+        }
+
+        function render() {
+            layer.style.transform =
+                "translate(" + state.currentX + "px, " + state.currentY + "px)";
+        }
+
+        function centerMap() {
+            var viewportSize = getViewportSize();
+            var layerSize = getLayerSize();
+            var bounds = getBounds();
+
+            var centeredX = (viewportSize.width - layerSize.width) / 2;
+            var centeredY = (viewportSize.height - layerSize.height) / 2;
+
+            state.currentX = clamp(centeredX, bounds.minX, bounds.maxX);
+            state.currentY = clamp(centeredY, bounds.minY, bounds.maxY);
+
+            render();
+        }
+
+        function panToMarker(marker) {
+            if (!marker) return;
+
+            var viewportSize = getViewportSize();
+            var bounds = getBounds();
+
+            var markerX = marker.offsetLeft;
+            var markerY = marker.offsetTop;
+
+            var targetX = viewportSize.width / 2 - markerX;
+            var targetY = viewportSize.height / 2 - markerY;
+
+            state.currentX = clamp(targetX, bounds.minX, bounds.maxX);
+            state.currentY = clamp(targetY, bounds.minY, bounds.maxY);
+
+            layer.style.transition = "transform 280ms ease";
+            render();
+
+            window.setTimeout(function () {
+                layer.style.transition = "";
+            }, 300);
+        }
+
+        function startDrag(clientX, clientY) {
+            state.isDragging = true;
+            state.startX = clientX;
+            state.startY = clientY;
+            state.initialX = state.currentX;
+            state.initialY = state.currentY;
+            viewport.classList.add("is-dragging");
+            layer.style.transition = "";
+        }
+
+        function moveDrag(clientX, clientY) {
+            if (!state.isDragging) return;
+
+            var dx = clientX - state.startX;
+            var dy = clientY - state.startY;
+            var bounds = getBounds();
+
+            state.currentX = clamp(state.initialX + dx, bounds.minX, bounds.maxX);
+            state.currentY = clamp(state.initialY + dy, bounds.minY, bounds.maxY);
+
+            render();
+        }
+
+        function endDrag() {
+            if (!state.isDragging) return;
+            state.isDragging = false;
+            viewport.classList.remove("is-dragging");
+        }
+
+        viewport.addEventListener("pointerdown", function (event) {
+            if (event.target.closest("a")) return;
+
+            startDrag(event.clientX, event.clientY);
+        });
+
+        window.addEventListener("pointermove", function (event) {
+            moveDrag(event.clientX, event.clientY);
+        });
+
+        window.addEventListener("pointerup", function () {
+            endDrag();
+        });
+
+        window.addEventListener("pointercancel", function () {
+            endDrag();
+        });
+
+        window.addEventListener("resize", function () {
+            centerMap();
+        });
+
+        markers.forEach(function (marker) {
+            marker.addEventListener("focus", function () {
+                panToMarker(marker);
+            });
+        });
+
+        centerMap();
+    })();
+    (function () {
+        var toggle = document.getElementById("mapHelperToggle");
+        var fallbackNav = document.getElementById("mapFallbackNav");
+
+        if (!toggle || !fallbackNav) return;
+
+        toggle.addEventListener("click", function () {
+            var isOpen = fallbackNav.classList.toggle("is-open");
+            toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+    })();
+</script>
 {% endblock content %}
