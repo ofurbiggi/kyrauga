@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils import timezone
+from urllib.parse import urlencode
 from wagtail.images import get_image_model_string
 from wagtail.images.models import AbstractImage, AbstractRendition, Image as WagtailImage
 
@@ -40,21 +42,68 @@ class CustomImage(AbstractImage):
     location_city = models.CharField(max_length=255, blank=True)
     location_country = models.CharField(max_length=255, blank=True)
 
-    admin_form_fields = list(WagtailImage.admin_form_fields) + [
-        "taken_at",
-        "camera_make",
-        "camera_model",
-        "lens_model",
-        "focal_length_mm",
-        "shutter_speed",
-        "aperture",
-        "iso",
-        "gps_latitude",
-        "gps_longitude",
-        "location_name",
-        "location_city",
-        "location_country",
-    ]
+    admin_form_fields = list(WagtailImage.admin_form_fields)
+
+    def metadata_items(self):
+        items = []
+
+        if self.taken_at:
+            local_taken_at = timezone.localtime(self.taken_at) if timezone.is_aware(self.taken_at) else self.taken_at
+            items.append(("Taken at", local_taken_at.strftime("%Y-%m-%d %H:%M")))
+
+        for label, value in (
+            ("Camera make", self.camera_make),
+            ("Camera model", self.camera_model),
+            ("Lens model", self.lens_model),
+            ("Focal length", f"{self.focal_length_mm} mm" if self.focal_length_mm is not None else ""),
+            ("Shutter speed", self.shutter_speed),
+            ("Aperture", f"f/{self.aperture}" if self.aperture is not None else ""),
+            ("ISO", str(self.iso) if self.iso is not None else ""),
+            ("Location name", self.location_name),
+            ("City", self.location_city),
+            ("Country", self.location_country),
+            ("GPS latitude", str(self.gps_latitude) if self.gps_latitude is not None else ""),
+            ("GPS longitude", str(self.gps_longitude) if self.gps_longitude is not None else ""),
+        ):
+            if value:
+                items.append((label, value))
+
+        return items
+
+    def has_gps_coordinates(self):
+        return self.gps_latitude is not None and self.gps_longitude is not None
+
+    def map_embed_url(self):
+        if not self.has_gps_coordinates():
+            return ""
+
+        latitude = float(self.gps_latitude)
+        longitude = float(self.gps_longitude)
+        lat_delta = 0.01
+        lon_delta = 0.02
+        params = urlencode(
+            {
+                "bbox": f"{longitude - lon_delta},{latitude - lat_delta},{longitude + lon_delta},{latitude + lat_delta}",
+                "layer": "mapnik",
+                "marker": f"{latitude},{longitude}",
+            }
+        )
+        return f"https://www.openstreetmap.org/export/embed.html?{params}"
+
+    def map_link_url(self):
+        if not self.has_gps_coordinates():
+            return ""
+
+        latitude = float(self.gps_latitude)
+        longitude = float(self.gps_longitude)
+        params = urlencode(
+            {
+                "mlat": latitude,
+                "mlon": longitude,
+                "zoom": 14,
+            }
+        )
+        return f"https://www.openstreetmap.org/?{params}"
 
 
 class CustomRendition(AbstractRendition):
