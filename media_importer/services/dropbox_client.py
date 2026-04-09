@@ -1,7 +1,9 @@
+import base64
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 
 from django.conf import settings
@@ -9,9 +11,11 @@ from django.core.exceptions import ImproperlyConfigured
 
 import dropbox
 from dropbox.exceptions import ApiError, AuthError
-from dropbox.files import FileMetadata
+from dropbox.files import FileMetadata, ThumbnailFormat, ThumbnailMode, ThumbnailSize
 
 from media_importer.models import DropboxAuthState
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -72,8 +76,10 @@ class DropboxClient:
             client.users_get_current_account()
             return client
         except AuthError as exc:
+            logger.exception("Dropbox authentication failed while creating client")
             raise DropboxClientError("Dropbox authentication failed") from exc
         except Exception as exc:
+            logger.exception("Unable to create Dropbox client")
             raise DropboxClientError("Unable to create Dropbox client") from exc
 
     def list_image_files(self, folder: Optional[str] = None) -> List[DropboxFileInfo]:
@@ -81,6 +87,7 @@ class DropboxClient:
         try:
             result = self.client.files_list_folder(folder_path, recursive=False)
         except ApiError as exc:
+            logger.exception("Could not list Dropbox folder %s", folder_path)
             raise DropboxClientError(f"Could not list folder {folder_path}") from exc
 
         files: List[DropboxFileInfo] = []
@@ -100,6 +107,7 @@ class DropboxClient:
             _, response = self.client.files_download(path)
             file_bytes = response.content
         except ApiError as exc:
+            logger.exception("Failed to download Dropbox file %s", path)
             raise DropboxClientError(f"Failed to download {path}") from exc
 
         if dest_path:
@@ -114,12 +122,19 @@ class DropboxClient:
             result = self.client.files_move_v2(source_path, destination, autorename=True)
             return result.metadata.path_display
         except ApiError as exc:
+            logger.exception("Failed to move Dropbox file from %s to %s", source_path, destination)
             raise DropboxClientError(f"Failed to move {source_path} to {destination}") from exc
 
-    def get_temporary_link(self, path: str) -> Optional[str]:
+    def get_thumbnail_data_url(self, path: str) -> Optional[str]:
         try:
-            link_metadata = self.client.files_get_temporary_link(path)
-            return link_metadata.link
+            _, response = self.client.files_get_thumbnail_v2(
+                dropbox.files.PathOrLink.path(path),
+                format=ThumbnailFormat.jpeg,
+                mode=ThumbnailMode.strict,
+                size=ThumbnailSize.w128h128,
+            )
+            encoded = base64.b64encode(response.content).decode("ascii")
+            return f"data:image/jpeg;base64,{encoded}"
         except ApiError:
             return None
 

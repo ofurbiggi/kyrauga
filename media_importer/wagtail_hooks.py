@@ -48,4 +48,4 @@ def register_admin_urls():
 
 @hooks.register('register_admin_menu_item')
 def register_dropbox_import_menu_item():
-    return MenuItem("Import from Dropbox", reverse("dropbox_import"), icon_name="download")
+    return MenuItem("Import images", reverse("dropbox_import"), icon_name="download")

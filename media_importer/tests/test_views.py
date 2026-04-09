@@ -137,13 +137,14 @@ class DropboxImporterViewTests(TestCase):
         )
         client_instance = mock_dropbox_client.return_value
         client_instance.list_image_files.return_value = [file_info]
-        client_instance.get_temporary_link.return_value = "https://example.com/photo.jpg"
+        client_instance.get_thumbnail_data_url.return_value = "data:image/jpeg;base64,abc123"
 
         response = self.client.get(reverse("dropbox_import"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Disconnect Dropbox")
         self.assertContains(response, "Example User")
+        self.assertContains(response, "Innflutningur í gangi")
         client_instance.list_image_files.assert_called_once()
 
     @patch("media_importer.views.DropboxClient")

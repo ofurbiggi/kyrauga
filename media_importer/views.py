@@ -1,4 +1,5 @@
 from datetime import timedelta
+import logging
 
 import dropbox
 from django.contrib import messages
@@ -14,8 +15,11 @@ from wagtail.admin.views.generic import WagtailAdminTemplateMixin
 from wagtail.images import get_image_model
 
 from .services.dropbox_client import DropboxClient, DropboxClientError
+from .services.importer import apply_import_metadata
 from .services.dropbox_oauth import DropboxOAuthError, build_authorize_url, exchange_code_for_tokens
 from .models import DropboxAuthState, ImportedDropboxAsset
+
+logger = logging.getLogger(__name__)
 
 
 class AdminAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -107,9 +111,11 @@ class DropboxOAuthDisconnectView(AdminAccessMixin, View):
 
 class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateView):
     template_name = 'media_importer/dropbox_import_index.html'
+    page_title = "Import images"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["page_title"] = self.page_title
         auth_state = DropboxAuthState.get_solo()
         context["auth_state"] = auth_state
         context["is_connected"] = auth_state.is_active and bool(auth_state.refresh_token)
@@ -129,9 +135,10 @@ class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateVie
             imported_ids = set(ImportedDropboxAsset.objects.values_list('dropbox_file_id', flat=True))
             for file in files:
                 file.is_imported = file.id in imported_ids
-                file.thumbnail_url = client.get_temporary_link(file.path_display)
+                file.thumbnail_url = client.get_thumbnail_data_url(file.path_display)
             context['files'] = files
         except DropboxClientError as e:
+            logger.warning("Failed to load Dropbox files for importer view: %s", e)
             context['error'] = str(e)
         return context
 
@@ -156,6 +163,7 @@ class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateVie
             files = client.list_image_files()
             file_dict = {f.path_display: f for f in files}
         except DropboxClientError:
+            logger.exception("Could not retrieve Dropbox file list during import POST")
             messages.error(request, 'Could not retrieve file list.')
             return redirect("dropbox_import")
 
@@ -171,12 +179,21 @@ class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateVie
                 continue
 
             try:
+                logger.info(
+                    "Starting Dropbox image import",
+                    extra={
+                        "dropbox_file_id": file_info.id,
+                        "dropbox_path": file_info.path_display,
+                        "file_name": file_info.name,
+                    },
+                )
                 file_bytes = client.download_file(file_info.path_display)
                 img = Image(
                     file=ContentFile(file_bytes, name=file_info.name),
                     title=file_info.name
                 )
                 img.save()
+                apply_import_metadata(img, file_bytes, file_info)
                 ImportedDropboxAsset.objects.create(
                     dropbox_file_id=file_info.id,
                     dropbox_path_lower=file_info.path_lower,
@@ -189,8 +206,25 @@ class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateVie
                     status='imported'
                 )
                 client.move_file(file_info.path_display)
+                logger.info(
+                    "Completed Dropbox image import",
+                    extra={
+                        "dropbox_file_id": file_info.id,
+                        "dropbox_path": file_info.path_display,
+                        "image_id": img.pk,
+                        "file_name": file_info.name,
+                    },
+                )
                 success_count += 1
             except Exception as e:
+                logger.exception(
+                    "Error importing Dropbox image",
+                    extra={
+                        "dropbox_file_id": getattr(file_info, "id", ""),
+                        "dropbox_path": getattr(file_info, "path_display", ""),
+                        "file_name": getattr(file_info, "name", ""),
+                    },
+                )
                 messages.error(request, f'Error importing {file_info.name}: {str(e)}')
                 error_count += 1
 

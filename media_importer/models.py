@@ -1,5 +1,6 @@
 from django.db import models
 from wagtail.images import get_image_model_string
+from wagtail.images.models import AbstractImage, AbstractRendition, Image as WagtailImage
 
 
 class DropboxAuthState(models.Model):
@@ -22,6 +23,54 @@ class DropboxAuthState(models.Model):
             identity = self.connected_email or self.connected_name or self.connected_account_id or "connected"
             return f"Dropbox connection ({identity})"
         return "Dropbox connection (disconnected)"
+
+
+class CustomImage(AbstractImage):
+    taken_at = models.DateTimeField(null=True, blank=True)
+    camera_make = models.CharField(max_length=255, blank=True)
+    camera_model = models.CharField(max_length=255, blank=True)
+    lens_model = models.CharField(max_length=255, blank=True)
+    focal_length_mm = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    shutter_speed = models.CharField(max_length=64, blank=True)
+    aperture = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    iso = models.PositiveIntegerField(null=True, blank=True)
+    gps_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    gps_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    location_name = models.CharField(max_length=255, blank=True)
+    location_city = models.CharField(max_length=255, blank=True)
+    location_country = models.CharField(max_length=255, blank=True)
+
+    admin_form_fields = list(WagtailImage.admin_form_fields) + [
+        "taken_at",
+        "camera_make",
+        "camera_model",
+        "lens_model",
+        "focal_length_mm",
+        "shutter_speed",
+        "aperture",
+        "iso",
+        "gps_latitude",
+        "gps_longitude",
+        "location_name",
+        "location_city",
+        "location_country",
+    ]
+
+
+class CustomRendition(AbstractRendition):
+    image = models.ForeignKey(
+        CustomImage,
+        on_delete=models.CASCADE,
+        related_name="renditions",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("image", "filter_spec", "focal_point_key"),
+                name="unique_rendition",
+            )
+        ]
 
 
 class ImportedDropboxAsset(models.Model):
