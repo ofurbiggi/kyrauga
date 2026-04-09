@@ -1,0 +1,19 @@
+.kyrauga-admin-logo {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  display: block;
+  border-radius: 999px;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.12));
+  transition:
+    transform 180ms ease,
+    filter 180ms ease,
+    opacity 180ms ease;
+  transform-origin: center;
+}
+
+.kyrauga-admin-logo:hover,
+.kyrauga-admin-logo:focus-visible {
+  filter: drop-shadow(0 12px 24px rgba(32, 201, 151, 0.28));
+  opacity: 0.96;
+}

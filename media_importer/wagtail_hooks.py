@@ -2,7 +2,9 @@ from wagtail import hooks
 from wagtail.admin.menu import MenuItem
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
+from django.templatetags.static import static
 from django.urls import path, reverse
+from django.utils.html import format_html
 
 from .models import ImportedDropboxAsset
 from .views import (
@@ -49,3 +51,11 @@ def register_admin_urls():
 @hooks.register('register_admin_menu_item')
 def register_dropbox_import_menu_item():
     return MenuItem("Import images", reverse("dropbox_import"), icon_name="download")
+
+
+@hooks.register("insert_global_admin_css")
+def insert_global_admin_css():
+    return format_html(
+        '<link rel="stylesheet" href="{}">',
+        static("css/wagtail-admin-branding.css"),
+    )
