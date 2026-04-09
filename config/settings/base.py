@@ -16,6 +16,12 @@ from pathlib import Path
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = PROJECT_DIR.parent
 
+# Load environment variables from .env.local file
+import os
+from dotenv import load_dotenv
+
+load_dotenv(BASE_DIR / ".env.local")
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -26,6 +32,7 @@ BASE_DIR = PROJECT_DIR.parent
 INSTALLED_APPS = [
     "home",
     "search",
+    "media_importer",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
     "wagtail.embeds",
@@ -180,3 +187,11 @@ WAGTAILADMIN_BASE_URL = "http://example.com"
 # if untrusted users are allowed to upload files -
 # see https://docs.wagtail.org/en/stable/advanced_topics/deploying.html#user-uploaded-files
 WAGTAILDOCS_EXTENSIONS = ['csv', 'docx', 'key', 'odt', 'pdf', 'pptx', 'rtf', 'txt', 'xlsx', 'zip']
+
+
+# Dropbox integration settings
+DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY')
+DROPBOX_APP_SECRET = os.environ.get('DROPBOX_APP_SECRET')
+DROPBOX_REDIRECT_URI = os.environ.get('DROPBOX_REDIRECT_URI')
+DROPBOX_TO_PUBLISH_FOLDER = os.environ.get('DROPBOX_TO_PUBLISH_FOLDER', '/30_Kyrauga/00_web_importer/to_publish')
+DROPBOX_PUBLISHED_FOLDER = os.environ.get('DROPBOX_PUBLISHED_FOLDER', '/30_Kyrauga/00_web_importer/published')

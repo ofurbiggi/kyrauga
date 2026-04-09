@@ -5,6 +5,7 @@ db.sqlite3
 media/
 staticfiles/
 .env
+.env.local
 .DS_Store
 .venv
 kyrauga-env
