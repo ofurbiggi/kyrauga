@@ -178,6 +178,7 @@ WAGTAILSEARCH_BACKENDS = {
     }
 }
 WAGTAILIMAGES_IMAGE_MODEL = "media_importer.CustomImage"
+WAGTAILIMAGES_IMAGE_FORM_BASE = "media_importer.forms.CustomImageForm"
 
 # Base URL to use when referring to full URLs within the Wagtail admin backend -
 # e.g. in notification emails. Don't include '/admin' or a trailing slash

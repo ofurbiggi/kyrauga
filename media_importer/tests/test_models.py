@@ -1,7 +1,10 @@
+from django import forms
 from django.test import TestCase
 from django.utils import timezone
 
-from media_importer.models import DropboxAuthState
+from wagtail.images.forms import get_image_form
+
+from media_importer.models import CustomImage, DropboxAuthState
 
 
 class DropboxAuthStateModelTests(TestCase):
@@ -34,3 +37,11 @@ class DropboxAuthStateModelTests(TestCase):
         self.assertEqual(refreshed.connected_name, "Example User")
         self.assertTrue(refreshed.is_active)
         self.assertEqual(refreshed.connected_at, connected_at)
+
+
+class CustomImageFormTests(TestCase):
+    def test_description_uses_textarea_widget(self):
+        form_class = get_image_form(CustomImage)
+        form = form_class()
+
+        self.assertIsInstance(form.fields["description"].widget, forms.Textarea)
