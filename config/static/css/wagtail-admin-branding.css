@@ -1,6 +1,7 @@
 .kyrauga-admin-logo {
   width: 112px;
   height: 112px;
+  padding: 0.5rem;
   object-fit: contain;
   display: block;
   border-radius: 999px;

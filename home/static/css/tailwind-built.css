@@ -574,6 +574,9 @@ video {
 .border {
   border-width: 1px;
 }
+.pb-8 {
+  padding-bottom: 2rem;
+}
 .uppercase {
   text-transform: uppercase;
 }
