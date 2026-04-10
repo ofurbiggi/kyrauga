@@ -1,0 +1,15 @@
+{% extends "wagtailadmin/shared/headers/slim_header.html" %}
+{% load wagtailadmin_tags %}
+
+{% block extra_form_fields %}
+    {{ extra_form_fields }}
+{% endblock %}
+
+{% block actions %}
+    {% for button in buttons %}
+        {% component button %}
+    {% endfor %}
+    <a href="{% url 'dropbox_import' %}" class="button button-small button-secondary">
+        Import images
+    </a>
+{% endblock %}
