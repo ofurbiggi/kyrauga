@@ -119,6 +119,21 @@ class ImporterMetadataTests(TestCase):
         self.assertEqual(str(metadata["focal_length_mm"]), "15.66")
         self.assertEqual(str(metadata["aperture"]), "2.80")
 
+    def test_extract_xmp_metadata_skips_invalid_lens_info_rationals(self):
+        file_bytes = b"""
+        <x:xmpmeta>
+            <rdf:Description
+                aux:Lens="XF23mmF2 R WR"
+                aux:LensInfo="0/0 0/0 2/1 2/1" />
+        </x:xmpmeta>
+        """
+
+        metadata = extract_xmp_metadata(file_bytes)
+
+        self.assertEqual(metadata["lens_model"], "XF23mmF2 R WR")
+        self.assertEqual(str(metadata["focal_length_mm"]), "23.00")
+        self.assertNotIn("aperture", metadata)
+
     @patch("media_importer.services.importer.PILImage.open")
     def test_xmp_capture_date_wins_when_only_generic_exif_datetime_exists(self, mock_open):
         fake_exif = FakeExif(values={306: "2026:04:09 22:30:03"})

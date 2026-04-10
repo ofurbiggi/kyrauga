@@ -63,10 +63,10 @@ XMP_PATTERNS = {
 }
 
 
-def apply_import_metadata(image, file_bytes, file_info):
-    metadata = extract_photo_metadata(file_bytes)
+def apply_import_metadata(image, file_bytes, file_info, description_override="", metadata=None):
+    metadata = metadata or extract_photo_metadata(file_bytes)
     apply_structured_metadata(image, metadata)
-    image.description = build_icelandic_description(metadata, file_info=file_info)
+    image.description = description_override or build_icelandic_description(metadata, file_info=file_info)
     image.save()
     image.tags.add(DROPBOX_IMPORT_TAG)
     logger.info(
@@ -191,6 +191,8 @@ def build_icelandic_description(metadata, file_info=None):
     return " ".join(segments)
 
 
+
+
 def format_icelandic_datetime(value):
     month = ICELANDIC_MONTH_NAMES[value.month]
     return f"{value.day}. {month} {value.year} kl. {value:%H:%M}"
@@ -230,7 +232,7 @@ def _extract_decimal(value):
 
     try:
         return Decimal(str(_rational_to_float(value))).quantize(Decimal("0.01"))
-    except (InvalidOperation, ValueError, TypeError):
+    except (InvalidOperation, ValueError, TypeError, ZeroDivisionError):
         return None
 
 
@@ -418,14 +420,20 @@ def _rational_to_float(value):
         value = value.strip()
         if "/" in value:
             numerator, denominator = value.split("/", 1)
+            if float(denominator) == 0:
+                raise ZeroDivisionError("Rational metadata value had a zero denominator")
             return float(numerator) / float(denominator)
         return float(value)
 
     if isinstance(value, tuple):
         numerator, denominator = value
+        if float(denominator) == 0:
+            raise ZeroDivisionError("Rational metadata value had a zero denominator")
         return float(numerator) / float(denominator)
 
     if hasattr(value, "numerator") and hasattr(value, "denominator"):
+        if float(value.denominator) == 0:
+            raise ZeroDivisionError("Rational metadata value had a zero denominator")
         return float(value.numerator) / float(value.denominator)
 
     return float(value)
