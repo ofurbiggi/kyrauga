@@ -16,11 +16,17 @@ from pathlib import Path
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = PROJECT_DIR.parent
 
-# Load environment variables from .env.local file
 import os
-from dotenv import load_dotenv
 
-load_dotenv(BASE_DIR / ".env.local")
+# Load local environment variables when python-dotenv is available.
+# Heroku uses real config vars and does not need python-dotenv during collectstatic.
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+if load_dotenv is not None:
+    load_dotenv(BASE_DIR / ".env.local")
 
 
 # Quick-start development settings - unsuitable for production
