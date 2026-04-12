@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "wagtail",
     "modelcluster",
     "taggit",
+    "storages",
     "django_filters",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -148,27 +149,59 @@ STATIC_ROOT = BASE_DIR / "static"
 STATIC_URL = "/static/"
 
 MEDIA_ROOT = BASE_DIR / "media"
-MEDIA_URL = "/media/"
 
-# Default storage settings
+# Set USE_R2=True in the environment to store Wagtail uploads in Cloudflare R2.
+# Leave it unset or set it to False locally to keep using the filesystem.
+USE_R2 = os.getenv("USE_R2", "False").lower() in {"1", "true", "yes", "on"}
+
+# Default storage settings.
+# Wagtail uploads use STORAGES["default"], while static files stay on WhiteNoise.
 # See https://docs.djangoproject.com/en/6.0/ref/settings/#std-setting-STORAGES
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
+if USE_R2:
+    R2_CUSTOM_DOMAIN = os.environ["R2_CUSTOM_DOMAIN"]
+    MEDIA_URL = f"https://{R2_CUSTOM_DOMAIN}/"
+
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": os.environ["R2_BUCKET_NAME"],
+            "access_key": os.environ["R2_ACCESS_KEY_ID"],
+            "secret_key": os.environ["R2_SECRET_ACCESS_KEY"],
+            "endpoint_url": os.environ["R2_ENDPOINT_URL"],
+            "region_name": "auto",
+            "default_acl": None,
+            "querystring_auth": False,
+            "custom_domain": R2_CUSTOM_DOMAIN,
+            "file_overwrite": False,
+            "object_parameters": {
+                "CacheControl": "public, max-age=31536000, immutable",
+            },
+            # Cloudflare R2 is S3-compatible and commonly works best with these.
+            "signature_version": "s3v4",
+            "addressing_style": "path",
+        },
+    }
+else:
+    MEDIA_URL = "/media/"
 
 # Django sets a maximum of 1000 fields per form by default, but particularly complex page models
 # can exceed this limit within Wagtail's page editor.
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10_000
 
+WAGTAILDOCS_SERVE_METHOD = "redirect"
 
 # Wagtail settings
 
-WAGTAIL_SITE_NAME = "config"
+WAGTAIL_SITE_NAME = "Kýrauga"
 
 # Search
 # https://docs.wagtail.org/en/stable/topics/search/backends.html

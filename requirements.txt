@@ -1,6 +1,8 @@
 anyascii==0.3.3
 asgiref==3.11.1
 beautifulsoup4==4.14.3
+boto3==1.42.88
+botocore==1.42.88
 certifi==2026.2.25
 charset-normalizer==3.4.6
 defusedxml==0.7.1
@@ -10,6 +12,7 @@ django-filter==25.2
 django-modelcluster==6.4.1
 django-permissionedforms==0.1
 django-stubs-ext==6.0.1
+django-storages==1.14.6
 django-taggit==6.1.0
 django-tasks==0.9.0
 django-treebeard==4.8.0
