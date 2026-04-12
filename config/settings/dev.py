@@ -11,6 +11,10 @@ ALLOWED_HOSTS = ["*"]
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
+# Local development and tests render templates without running collectstatic first.
+# Production keeps WhiteNoise's compressed manifest storage in production.py.
+STORAGES["staticfiles"]["BACKEND"] = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
 
 try:
     from .local import *

@@ -1,17 +1,14 @@
+from __future__ import annotations
+
 import base64
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from datetime import datetime
 import logging
 
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
-
-import dropbox
-from dropbox.exceptions import ApiError, AuthError
-from dropbox.files import FileMetadata, ThumbnailFormat, ThumbnailMode, ThumbnailSize
 
 from media_importer.models import DropboxAuthState
 
@@ -34,10 +31,21 @@ class DropboxClientError(Exception):
     pass
 
 
+def load_dropbox_sdk() -> Any:
+    try:
+        import dropbox
+    except ImportError as exc:
+        raise DropboxClientError(
+            "Dropbox importer is unavailable because the Dropbox Python SDK is not installed."
+        ) from exc
+    return dropbox
+
+
 class DropboxClient:
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
     def __init__(self):
+        self.dropbox = load_dropbox_sdk()
         self.app_key = getattr(settings, "DROPBOX_APP_KEY", None)
         self.app_secret = getattr(settings, "DROPBOX_APP_SECRET", None)
         self.to_publish_folder = getattr(settings, "DROPBOX_TO_PUBLISH_FOLDER", None)
@@ -60,22 +68,22 @@ class DropboxClient:
             if not getattr(settings, name, None)
         ]
         if missing:
-            raise ImproperlyConfigured(
+            raise DropboxClientError(
                 f"Missing Dropbox settings: {', '.join(missing)}"
             )
         if not self.refresh_token:
             raise DropboxClientError("Dropbox is not connected")
 
-    def _create_client(self) -> dropbox.Dropbox:
+    def _create_client(self) -> Any:
         try:
-            client = dropbox.Dropbox(
+            client = self.dropbox.Dropbox(
                 oauth2_refresh_token=self.refresh_token,
                 app_key=self.app_key,
                 app_secret=self.app_secret,
             )
             client.users_get_current_account()
             return client
-        except AuthError as exc:
+        except self.dropbox.exceptions.AuthError as exc:
             logger.exception("Dropbox authentication failed while creating client")
             raise DropboxClientError("Dropbox authentication failed") from exc
         except Exception as exc:
@@ -86,7 +94,7 @@ class DropboxClient:
         folder_path = folder or self.to_publish_folder
         try:
             result = self.client.files_list_folder(folder_path, recursive=False)
-        except ApiError as exc:
+        except self.dropbox.exceptions.ApiError as exc:
             logger.exception("Could not list Dropbox folder %s", folder_path)
             raise DropboxClientError(f"Could not list folder {folder_path}") from exc
 
@@ -106,7 +114,7 @@ class DropboxClient:
         try:
             _, response = self.client.files_download(path)
             file_bytes = response.content
-        except ApiError as exc:
+        except self.dropbox.exceptions.ApiError as exc:
             logger.exception("Failed to download Dropbox file %s", path)
             raise DropboxClientError(f"Failed to download {path}") from exc
 
@@ -121,29 +129,29 @@ class DropboxClient:
         try:
             result = self.client.files_move_v2(source_path, destination, autorename=True)
             return result.metadata.path_display
-        except ApiError as exc:
+        except self.dropbox.exceptions.ApiError as exc:
             logger.exception("Failed to move Dropbox file from %s to %s", source_path, destination)
             raise DropboxClientError(f"Failed to move {source_path} to {destination}") from exc
 
     def get_thumbnail_data_url(self, path: str) -> Optional[str]:
         try:
             _, response = self.client.files_get_thumbnail_v2(
-                dropbox.files.PathOrLink.path(path),
-                format=ThumbnailFormat.jpeg,
-                mode=ThumbnailMode.strict,
-                size=ThumbnailSize.w128h128,
+                self.dropbox.files.PathOrLink.path(path),
+                format=self.dropbox.files.ThumbnailFormat.jpeg,
+                mode=self.dropbox.files.ThumbnailMode.strict,
+                size=self.dropbox.files.ThumbnailSize.w128h128,
             )
             encoded = base64.b64encode(response.content).decode("ascii")
             return f"data:image/jpeg;base64,{encoded}"
-        except ApiError:
+        except self.dropbox.exceptions.ApiError:
             return None
 
     def _is_image_file(self, entry) -> bool:
-        if not isinstance(entry, FileMetadata):
+        if not isinstance(entry, self.dropbox.files.FileMetadata):
             return False
         return Path(entry.name).suffix.lower() in self.IMAGE_EXTENSIONS
 
-    def _convert_entry(self, entry: FileMetadata) -> DropboxFileInfo:
+    def _convert_entry(self, entry) -> DropboxFileInfo:
         return DropboxFileInfo(
             id=entry.id,
             name=entry.name,

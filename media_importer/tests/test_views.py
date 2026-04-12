@@ -10,7 +10,18 @@ from PIL import Image as PILImage
 from io import BytesIO
 
 from media_importer.models import DropboxAuthState
+from media_importer.services.dropbox_client import DropboxClientError
 from media_importer.services.dropbox_oauth import DropboxOAuthError
+
+
+TEST_STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 
 @override_settings(
@@ -19,6 +30,7 @@ from media_importer.services.dropbox_oauth import DropboxOAuthError
     DROPBOX_REDIRECT_URI="http://127.0.0.1:8000/admin/dropbox-import/oauth/callback/",
     DROPBOX_TO_PUBLISH_FOLDER="/to-publish",
     DROPBOX_PUBLISHED_FOLDER="/published",
+    STORAGES=TEST_STORAGES,
 )
 class DropboxOAuthViewTests(TestCase):
     def setUp(self):
@@ -57,24 +69,24 @@ class DropboxOAuthViewTests(TestCase):
             "name": "Example User",
         }
 
-        response = self.client.get(reverse("dropbox_oauth_callback"), {"code": "oauth-code"}, follow=True)
+        response = self.client.get(reverse("dropbox_oauth_callback"), {"code": "oauth-code"})
 
         auth_state = DropboxAuthState.get_solo()
         self.assertTrue(auth_state.is_active)
         self.assertEqual(auth_state.refresh_token, "refresh-token")
         self.assertEqual(auth_state.connected_email, "user@example.com")
-        self.assertRedirects(response, reverse("dropbox_import"))
+        self.assertRedirects(response, reverse("dropbox_import"), fetch_redirect_response=False)
         messages = [message.message for message in get_messages(response.wsgi_request)]
         self.assertIn("Dropbox account connected successfully.", messages)
 
     @patch("media_importer.views.exchange_code_for_tokens", side_effect=DropboxOAuthError("boom"))
     def test_oauth_callback_failure_does_not_activate_connection(self, mock_exchange_code_for_tokens):
-        response = self.client.get(reverse("dropbox_oauth_callback"), {"code": "oauth-code"}, follow=True)
+        response = self.client.get(reverse("dropbox_oauth_callback"), {"code": "oauth-code"})
 
         auth_state = DropboxAuthState.get_solo()
         self.assertFalse(auth_state.is_active)
         self.assertEqual(auth_state.refresh_token, "")
-        self.assertRedirects(response, reverse("dropbox_import"))
+        self.assertRedirects(response, reverse("dropbox_import"), fetch_redirect_response=False)
         messages = [message.message for message in get_messages(response.wsgi_request)]
         self.assertIn("boom", messages)
         mock_exchange_code_for_tokens.assert_called_once()
@@ -92,7 +104,7 @@ class DropboxOAuthViewTests(TestCase):
         auth_state.refresh_from_db()
         self.assertFalse(auth_state.is_active)
         self.assertEqual(auth_state.refresh_token, "")
-        self.assertRedirects(response, reverse("dropbox_import"))
+        self.assertRedirects(response, reverse("dropbox_import"), fetch_redirect_response=False)
         messages = [message.message for message in get_messages(response.wsgi_request)]
         self.assertIn("Dropbox account disconnected.", messages)
 
@@ -103,6 +115,7 @@ class DropboxOAuthViewTests(TestCase):
     DROPBOX_REDIRECT_URI="http://127.0.0.1:8000/admin/dropbox-import/oauth/callback/",
     DROPBOX_TO_PUBLISH_FOLDER="/to-publish",
     DROPBOX_PUBLISHED_FOLDER="/published",
+    STORAGES=TEST_STORAGES,
 )
 class DropboxImporterViewTests(TestCase):
     def setUp(self):
@@ -151,14 +164,50 @@ class DropboxImporterViewTests(TestCase):
         self.assertContains(response, "View imported Dropbox assets")
         client_instance.list_image_files.assert_called_once()
 
+    @patch(
+        "media_importer.views.DropboxClient",
+        side_effect=DropboxClientError("Dropbox importer is unavailable."),
+    )
+    def test_connected_state_shows_error_when_dropbox_client_is_unavailable(self, mock_dropbox_client):
+        auth_state = DropboxAuthState.get_solo()
+        auth_state.refresh_token = "refresh-token"
+        auth_state.is_active = True
+        auth_state.save()
+
+        response = self.client.get(reverse("dropbox_import"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dropbox importer is unavailable.")
+        mock_dropbox_client.assert_called_once()
+
     @patch("media_importer.views.DropboxClient")
     def test_import_post_fails_gracefully_when_disconnected(self, mock_dropbox_client):
         response = self.client.post(reverse("dropbox_import"), {"selected_files": ["/to-publish/photo.jpg"]}, follow=True)
 
-        self.assertRedirects(response, reverse("dropbox_import"))
+        self.assertRedirects(response, reverse("dropbox_import"), fetch_redirect_response=False)
         messages = [message.message for message in get_messages(response.wsgi_request)]
         self.assertIn("Dropbox is not connected yet.", messages)
         mock_dropbox_client.assert_not_called()
+
+    @patch(
+        "media_importer.views.DropboxClient",
+        side_effect=DropboxClientError("Missing Dropbox settings: DROPBOX_APP_KEY"),
+    )
+    def test_import_post_fails_gracefully_when_client_cannot_start(self, mock_dropbox_client):
+        auth_state = DropboxAuthState.get_solo()
+        auth_state.refresh_token = "refresh-token"
+        auth_state.is_active = True
+        auth_state.save()
+
+        response = self.client.post(
+            reverse("dropbox_import"),
+            {"selected_files": ["/to-publish/photo.jpg"]},
+        )
+
+        self.assertRedirects(response, reverse("dropbox_import"), fetch_redirect_response=False)
+        messages = [message.message for message in get_messages(response.wsgi_request)]
+        self.assertIn("Missing Dropbox settings: DROPBOX_APP_KEY", messages)
+        mock_dropbox_client.assert_called_once()
 
     @patch("media_importer.views.DropboxImportView._extract_metadata")
     @patch("media_importer.views.DropboxClient")

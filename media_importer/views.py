@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 import logging
 from decimal import Decimal
 
-import dropbox
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.files.base import ContentFile
@@ -15,7 +14,7 @@ from wagtail.admin.views.generic import WagtailAdminTemplateMixin
 
 from wagtail.images import get_image_model
 
-from .services.dropbox_client import DropboxClient, DropboxClientError
+from .services.dropbox_client import DropboxClient, DropboxClientError, load_dropbox_sdk
 from .services.importer import apply_import_metadata
 from .services.dropbox_oauth import DropboxOAuthError, build_authorize_url, exchange_code_for_tokens
 from .models import DropboxAuthState, ImportedDropboxAsset
@@ -82,8 +81,12 @@ class DropboxOAuthCallbackView(AdminAccessMixin, View):
             return {}
 
         try:
+            dropbox = load_dropbox_sdk()
             client = dropbox.Dropbox(oauth2_access_token=access_token)
             account = client.users_get_current_account()
+        except DropboxClientError as exc:
+            logger.warning("Could not fetch Dropbox account info: %s", exc)
+            return {}
         except Exception:
             return {}
 
@@ -160,17 +163,17 @@ class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateVie
             messages.error(request, 'No files selected.')
             return redirect("dropbox_import")
 
-        client = DropboxClient()
         Image = get_image_model()
         success_count = 0
         error_count = 0
 
         try:
+            client = DropboxClient()
             files = client.list_image_files()
             file_dict = {f.path_display: f for f in files}
-        except DropboxClientError:
-            logger.exception("Could not retrieve Dropbox file list during import POST")
-            messages.error(request, 'Could not retrieve file list.')
+        except DropboxClientError as exc:
+            logger.warning("Could not prepare Dropbox import POST: %s", exc)
+            messages.error(request, str(exc))
             return redirect("dropbox_import")
 
         if request.POST.get("edit_descriptions") == "1":
@@ -299,17 +302,17 @@ class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateVie
             messages.error(request, "Description edit session expired. Please select your files again.")
             return redirect("dropbox_import")
 
-        client = DropboxClient()
         Image = get_image_model()
         success_count = 0
         error_count = 0
 
         try:
+            client = DropboxClient()
             files = client.list_image_files()
             file_dict = {f.path_display: f for f in files}
-        except DropboxClientError:
-            logger.exception("Could not retrieve Dropbox file list during confirmation POST")
-            messages.error(request, "Could not retrieve file list.")
+        except DropboxClientError as exc:
+            logger.warning("Could not prepare Dropbox confirmation POST: %s", exc)
+            messages.error(request, str(exc))
             return redirect("dropbox_import")
 
         for index, draft in enumerate(drafts):
