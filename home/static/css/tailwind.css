@@ -2,7 +2,87 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Optional custom theme and utilities */
+@layer base {
+  html {
+    @apply scroll-smooth bg-bg text-text;
+  }
+
+  body {
+    @apply min-h-screen bg-bg font-body text-text antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display text-text;
+  }
+
+  a {
+    @apply text-secondary transition-colors duration-200;
+  }
+
+  a:hover {
+    @apply text-secondary-strong;
+  }
+
+  ::selection {
+    @apply bg-brand text-text;
+  }
+}
+
+@layer components {
+  .ky-page {
+    @apply min-h-screen bg-bg text-text;
+  }
+
+  .ky-surface {
+    @apply rounded-lg border border-border bg-surface shadow-soft;
+  }
+
+  .ky-surface-muted {
+    @apply rounded-lg border border-border bg-surface-muted shadow-soft;
+  }
+
+  .ky-title {
+    @apply font-display text-brand;
+  }
+
+  .ky-kicker {
+    @apply font-body text-xs font-semibold uppercase tracking-[0.16em] text-text-muted;
+  }
+
+  .ky-link {
+    @apply font-semibold text-secondary underline decoration-brand decoration-2 underline-offset-4;
+  }
+
+  .ky-link:hover {
+    @apply text-secondary-strong decoration-brand-strong;
+  }
+
+  .ky-button-primary {
+    @apply inline-flex items-center justify-center rounded-md bg-brand px-5 py-3 font-semibold text-text shadow-soft transition duration-200;
+  }
+
+  .ky-button-primary:hover {
+    @apply -translate-y-0.5 bg-brand-strong text-text shadow-card;
+  }
+
+  .ky-button-secondary {
+    @apply inline-flex items-center justify-center rounded-md border border-border-strong bg-surface px-5 py-3 font-semibold text-secondary-strong shadow-soft transition duration-200;
+  }
+
+  .ky-button-secondary:hover {
+    @apply -translate-y-0.5 border-secondary bg-secondary-soft text-secondary-strong;
+  }
+
+  .ky-badge {
+    @apply inline-flex items-center rounded-full border border-brand-strong bg-brand-soft px-3 py-1 font-body text-sm font-semibold text-text;
+  }
+
+  .ky-border {
+    @apply border border-border;
+  }
+}
 
 /* Example: keep existing hero styles via a class */
 .hero-bg {
