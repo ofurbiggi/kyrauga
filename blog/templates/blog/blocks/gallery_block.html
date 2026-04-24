@@ -1,0 +1,18 @@
+{% load wagtailimages_tags %}
+
+<section class="space-y-4">
+    {% if value.heading %}
+    <h2 class="text-2xl font-display text-text">{{ value.heading }}</h2>
+    {% endif %}
+    <div class="grid gap-4 md:grid-cols-2">
+        {% for image in value.images %}
+            {% image image fill-900x700 as gallery_image %}
+            <figure class="overflow-hidden rounded-xl border border-border bg-surface shadow-soft">
+                <img src="{{ gallery_image.url }}" alt="{{ image.description|default:image.title }}" class="aspect-[4/3] w-full object-cover">
+            </figure>
+        {% endfor %}
+    </div>
+    {% if value.caption %}
+    <p class="text-sm leading-7 text-text-muted">{{ value.caption }}</p>
+    {% endif %}
+</section>

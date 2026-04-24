@@ -1,0 +1,28 @@
+{% load wagtailimages_tags %}
+
+<article class="overflow-hidden rounded-[1.5rem] border border-border bg-surface-muted shadow-soft">
+    <a href="{{ series_page.url }}" class="grid gap-0 md:grid-cols-[16rem_minmax(0,1fr)]">
+        <div class="bg-bg-soft">
+            {% if series_page.cover_image %}
+                {% image series_page.cover_image fill-900x900 as series_image %}
+                <img src="{{ series_image.url }}" alt="{{ series_page.title }}" class="h-full w-full object-cover">
+            {% else %}
+                <div class="flex h-full min-h-64 items-center justify-center px-6 text-center text-text-muted">Series</div>
+            {% endif %}
+        </div>
+        <div class="flex flex-col justify-between gap-4 p-5">
+            <div class="space-y-3">
+                {% if pinned %}
+                <span class="ky-badge">Pinned series</span>
+                {% endif %}
+                <h3 class="text-2xl font-display text-text">{{ series_page.title }}</h3>
+                {% if series_page.intro %}
+                <div class="line-clamp-4 text-sm leading-7 text-text-muted">{{ series_page.intro|striptags }}</div>
+                {% endif %}
+            </div>
+            <p class="text-sm font-semibold uppercase tracking-[0.12em] text-text-muted">
+                {{ series_page.connected_posts_count }} posts
+            </p>
+        </div>
+    </a>
+</article>

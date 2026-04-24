@@ -1,0 +1,20 @@
+{% load wagtailimages_tags %}
+
+<article class="group overflow-hidden rounded-[1.5rem] border border-border bg-surface shadow-soft transition duration-200 hover:-translate-y-1 hover:shadow-card">
+    <a href="{{ blog_post.url }}" class="block">
+        <div class="overflow-hidden">
+            {% image blog_post.featured_image fill-900x700 as card_image %}
+            <img src="{{ card_image.url }}" alt="{{ blog_post.best_alt_text }}" class="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.02]">
+        </div>
+        <div class="space-y-3 p-5">
+            {% if pinned %}
+            <span class="ky-badge">Pinned post</span>
+            {% endif %}
+            <h3 class="text-2xl font-display text-text">{{ blog_post.title }}</h3>
+            <p class="text-sm font-semibold uppercase tracking-[0.12em] text-text-muted">{{ blog_post.display_date|date:"Y-m-d" }}</p>
+            {% if blog_post.has_location %}
+            <p class="text-sm text-text-muted">{{ blog_post.resolved_latitude }}, {{ blog_post.resolved_longitude }}</p>
+            {% endif %}
+        </div>
+    </a>
+</article>

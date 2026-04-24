@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block body_class %}template-blog-page{% endblock %}
+
+{% block meta_tags %}
+{% with seo_desc=page.seo_description %}
+{% if seo_desc %}<meta name="description" content="{{ seo_desc }}">{% endif %}
+<link rel="canonical" href="{{ page.full_url }}">
+<meta property="og:title" content="{{ page.title }}">
+{% if seo_desc %}<meta property="og:description" content="{{ seo_desc }}">{% endif %}
+{% if og_image_url %}<meta property="og:image" content="{{ og_image_url }}">{% endif %}
+<meta property="og:url" content="{{ page.full_url }}">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ page.title }}">
+{% if seo_desc %}<meta name="twitter:description" content="{{ seo_desc }}">{% endif %}
+{% if og_image_url %}<meta name="twitter:image" content="{{ og_image_url }}">{% endif %}
+{% endwith %}
+{% endblock %}
+
+{% block content %}
+<main class="ky-page">
+    <article class="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10 md:px-8 lg:px-12">
+        <header class="flex flex-col gap-5">
+            <p class="ky-kicker">{{ page.display_date|date:"F j, Y" }}</p>
+            <h1 class="ky-title text-4xl md:text-6xl">{{ page.title }}</h1>
+            {% if page.caption %}
+            <p class="max-w-3xl text-lg leading-8 text-text-muted">{{ page.caption }}</p>
+            {% endif %}
+        </header>
+
+        <figure class="overflow-hidden rounded-[2rem] border border-border bg-surface shadow-card">
+            {% image page.featured_image width-1600 as hero_image %}
+            <img src="{{ hero_image.url }}" alt="{{ page.best_alt_text }}" class="h-auto w-full object-cover">
+        </figure>
+
+        <section class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+            <div class="space-y-8">
+                {% if page.body %}
+                <div class="prose max-w-none prose-p:text-text prose-strong:text-text">
+                    {{ page.body }}
+                </div>
+                {% endif %}
+
+                {% if related_series %}
+                <section class="space-y-3">
+                    <h2 class="text-2xl font-display text-text">Series</h2>
+                    <div class="flex flex-wrap gap-3">
+                        {% for series in related_series %}
+                        <a href="{{ series.url }}" class="ky-badge">{{ series.title }}</a>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+            </div>
+
+            <aside class="space-y-6">
+                <section class="ky-surface p-5">
+                    <h2 class="mb-4 text-lg font-display text-text">Details</h2>
+                    <dl class="grid gap-3 text-sm">
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="font-semibold text-text-muted">Date</dt>
+                            <dd class="text-right text-text">{{ page.display_date|date:"Y-m-d H:i" }}</dd>
+                        </div>
+                        {% if page.aperture_display %}
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="font-semibold text-text-muted">Aperture</dt>
+                            <dd class="text-right text-text">{{ page.aperture_display }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if page.focal_length_display %}
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="font-semibold text-text-muted">Focal length</dt>
+                            <dd class="text-right text-text">{{ page.focal_length_display }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if page.exposure_display %}
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="font-semibold text-text-muted">Exposure</dt>
+                            <dd class="text-right text-text">{{ page.exposure_display }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if page.has_location %}
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="font-semibold text-text-muted">Coordinates</dt>
+                            <dd class="text-right text-text">{{ page.resolved_latitude }}, {{ page.resolved_longitude }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </section>
+
+                {% if page.has_location %}
+                <section class="ky-surface overflow-hidden p-0">
+                    <div class="flex items-center justify-between border-b border-border px-5 py-4">
+                        <h2 class="text-lg font-display text-text">Location</h2>
+                        <a href="{{ page.map_link_url }}" class="text-sm font-semibold text-secondary-strong" target="_blank" rel="noreferrer">Open map</a>
+                    </div>
+                    <iframe src="{{ page.map_embed_url }}" class="h-72 w-full" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Map showing this post location"></iframe>
+                </section>
+                {% endif %}
+            </aside>
+        </section>
+    </article>
+</main>
+{% endblock %}

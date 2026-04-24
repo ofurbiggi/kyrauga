@@ -38,6 +38,7 @@ if load_dotenv is not None:
 INSTALLED_APPS = [
     "home",
     "search",
+    "blog",
     "media_importer",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -208,6 +209,7 @@ WAGTAILDOCS_SERVE_METHOD = "redirect"
 # Wagtail settings
 
 WAGTAIL_SITE_NAME = "Kýrauga"
+WAGTAIL_ALLOW_UNICODE_SLUGS = False
 
 # Search
 # https://docs.wagtail.org/en/stable/topics/search/backends.html
