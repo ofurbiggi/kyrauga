@@ -155,7 +155,7 @@ class BlogPageModelTests(TestCase):
     def test_index_excludes_pinned_blog_pages_from_automatic_list(self):
         pinned_page = self.make_blog_page(title="Pinned", slug="pinned")
         regular_page = self.make_blog_page(title="Regular", slug="regular")
-        BlogIndexPagePinnedItem.objects.create(page=self.index_page, blog_page=pinned_page)
+        BlogIndexPagePinnedItem.objects.create(page=self.index_page, target_page=pinned_page)
 
         context = self.get_index_context()
 
@@ -207,7 +207,13 @@ class BlogPageModelTests(TestCase):
             BlogIndexPagePinnedItem(page=self.index_page).clean()
 
         with self.assertRaises(ValidationError):
-            BlogIndexPagePinnedItem(page=self.index_page, blog_page=page, series_page=series).clean()
+            BlogIndexPagePinnedItem(page=self.index_page, target_page=self.index_page).clean()
+
+        item = BlogIndexPagePinnedItem(page=self.index_page, target_page=page)
+        item.clean()
+
+        item = BlogIndexPagePinnedItem(page=self.index_page, target_page=series)
+        item.clean()
 
     def test_best_alt_text_fallback_logic(self):
         image = self.make_image(description="Descriptive image text")

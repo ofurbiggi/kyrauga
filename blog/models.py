@@ -1,6 +1,7 @@
 from decimal import Decimal
 from urllib.parse import urlencode
 
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
@@ -78,11 +79,14 @@ class BlogIndexPage(Page):
     ]
 
     def get_pinned_items(self):
-        return self.pinned_items.select_related("blog_page", "series_page").all()
+        return self.pinned_items.select_related("target_page", "target_page__content_type").all()
 
     def get_pinned_blog_page_ids(self):
+        blog_page_content_type = ContentType.objects.get_for_model(BlogPage, for_concrete_model=False)
         return list(
-            self.pinned_items.exclude(blog_page__isnull=True).values_list("blog_page_id", flat=True)
+            self.pinned_items.filter(target_page__content_type=blog_page_content_type).values_list(
+                "target_page_id", flat=True
+            )
         )
 
     def get_base_blog_pages_queryset(self):
@@ -467,39 +471,31 @@ class BlogIndexPagePinnedItem(Orderable):
         related_name="pinned_items",
         on_delete=models.CASCADE,
     )
-    blog_page = models.ForeignKey(
-        "blog.BlogPage",
+    target_page = models.ForeignKey(
+        "wagtailcore.Page",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="+",
-    )
-    series_page = models.ForeignKey(
-        "blog.PhotoSeriesPage",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name="+",
     )
 
     panels = [
-        FieldPanel("blog_page"),
-        FieldPanel("series_page"),
+        FieldPanel("target_page"),
     ]
 
     def clean(self):
         super().clean()
-        if bool(self.blog_page) == bool(self.series_page):
-            raise ValidationError("Choose exactly one pinned target: either a blog page or a series page.")
+        if self.target_page_id is None:
+            raise ValidationError({"target_page": "Choose a blog page or a series page."})
+        if not isinstance(self.target_page.specific, (BlogPage, PhotoSeriesPage)):
+            raise ValidationError({"target_page": "Pinned items must be a blog page or a series page."})
 
     @property
     def pinned_object(self):
-        return self.blog_page or self.series_page
+        return self.target_page.specific
 
     @property
     def is_blog_page(self):
-        return self.blog_page_id is not None
+        return isinstance(self.pinned_object, BlogPage)
 
     @property
     def is_series_page(self):
-        return self.series_page_id is not None
+        return isinstance(self.pinned_object, PhotoSeriesPage)

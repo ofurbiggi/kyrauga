@@ -3,6 +3,18 @@
 
 {% block body_class %}template-blog-index{% endblock %}
 
+{% block extra_css %}
+{{ block.super }}
+{% if map_points %}
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <main class="ky-page">
     <section class="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-10 md:px-8 lg:px-12">
@@ -68,9 +80,9 @@
             <div class="grid gap-6 lg:grid-cols-2">
                 {% for item in pinned_items %}
                     {% if item.is_blog_page %}
-                        {% include "blog/includes/blog_page_card.html" with blog_post=item.blog_page pinned=True %}
+                        {% include "blog/includes/blog_page_card.html" with blog_post=item.pinned_object pinned=True %}
                     {% elif item.is_series_page %}
-                        {% include "blog/includes/photo_series_card.html" with series_page=item.series_page pinned=True %}
+                        {% include "blog/includes/photo_series_card.html" with series_page=item.pinned_object pinned=True %}
                     {% endif %}
                 {% endfor %}
             </div>
@@ -123,8 +135,8 @@
                 <h2 class="text-2xl font-display text-text">Map</h2>
                 <button type="button" class="ky-button-secondary" data-blog-map-close>Close</button>
             </div>
-            <div class="flex-1 rounded-xl border border-dashed border-border-strong bg-bg-soft p-4 text-sm text-text-muted" data-blog-map-canvas>
-                Map overlay hook ready for geotagged posts.
+            <div class="relative flex-1 overflow-hidden rounded-xl border border-border-strong bg-bg-soft">
+                <div class="h-full min-h-[24rem] w-full" data-blog-map-canvas></div>
             </div>
         </div>
         <aside class="overflow-y-auto rounded-xl border border-border bg-surface p-4">
@@ -139,6 +151,11 @@
 {% block extra_js %}
 {{ block.super }}
 {% if map_points %}
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
 <script>
   (() => {
     const openButton = document.querySelector("[data-blog-map-toggle]");
@@ -152,10 +169,47 @@
     }
 
     const points = JSON.parse(dataNode.textContent);
+    if (!Array.isArray(points) || !window.L) {
+      return;
+    }
+
     window.kyraugaBlogMapPoints = points;
+
+    const map = L.map(canvas, {
+      zoomControl: true,
+      scrollWheelZoom: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    const markers = [];
+    const bounds = [];
 
     list.innerHTML = "";
     points.forEach((point) => {
+      const popupImage = point.thumbnail
+        ? `<img src="${point.thumbnail}" alt="" class="mb-2 h-24 w-full rounded-md object-cover">`
+        : "";
+      const marker = L.circleMarker([point.latitude, point.longitude], {
+        radius: 8,
+        color: "#1f3f7a",
+        weight: 2,
+        fillColor: "#66f1d2",
+        fillOpacity: 0.9,
+      }).addTo(map);
+      marker.bindPopup(`
+        <div class="w-48">
+          ${popupImage}
+          <a href="${point.url}" class="block font-semibold text-secondary-strong">${point.title}</a>
+          <p class="mt-1 text-sm text-slate-600">${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</p>
+        </div>
+      `);
+      markers.push(marker);
+      bounds.push([point.latitude, point.longitude]);
+
       const item = document.createElement("article");
       item.className = "rounded-lg border border-border bg-bg-soft p-3";
       item.innerHTML = `
@@ -163,21 +217,31 @@
         <p class="mt-1 text-sm text-text-muted">${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</p>
       `;
       item.addEventListener("mouseenter", () => {
-        canvas.innerHTML = `
-          <div class="flex h-full flex-col justify-between rounded-lg bg-surface p-4">
-            <div>
-              <p class="text-sm font-semibold text-text-muted">Selected point</p>
-              <h4 class="mt-1 text-xl font-display text-text">${point.title}</h4>
-              <p class="mt-2 text-sm text-text-muted">${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</p>
-            </div>
-            <a href="${point.url}" class="ky-button-primary w-fit">Open post</a>
-          </div>
-        `;
+        marker.openPopup();
+        map.flyTo([point.latitude, point.longitude], Math.max(map.getZoom(), 9), {
+          duration: 0.5,
+        });
       });
+      item.addEventListener("focusin", () => marker.openPopup());
       list.appendChild(item);
     });
 
-    openButton.addEventListener("click", () => overlay.classList.remove("hidden"));
+    if (bounds.length === 1) {
+      map.setView(bounds[0], 10);
+    } else if (bounds.length > 1) {
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+
+    let mapInitialized = false;
+    openButton.addEventListener("click", () => {
+      overlay.classList.remove("hidden");
+      if (!mapInitialized) {
+        mapInitialized = true;
+        setTimeout(() => map.invalidateSize(), 50);
+      } else {
+        setTimeout(() => map.invalidateSize(), 50);
+      }
+    });
     closeButton.addEventListener("click", () => overlay.classList.add("hidden"));
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) {
