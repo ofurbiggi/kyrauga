@@ -1,0 +1,8 @@
+<blockquote class="rounded-2xl border border-border bg-bg-soft p-6 text-lg italic text-text shadow-soft">
+    <p>{{ value.quote }}</p>
+    {% if value.attribution %}
+    <footer class="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-text-muted">
+        {{ value.attribution }}
+    </footer>
+    {% endif %}
+</blockquote>

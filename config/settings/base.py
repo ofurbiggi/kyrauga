@@ -38,7 +38,9 @@ if load_dotenv is not None:
 INSTALLED_APPS = [
     "home",
     "search",
+    "blog",
     "media_importer",
+    "wagtail.contrib.settings",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
     "wagtail.embeds",
@@ -208,6 +210,7 @@ WAGTAILDOCS_SERVE_METHOD = "redirect"
 # Wagtail settings
 
 WAGTAIL_SITE_NAME = "Kýrauga"
+WAGTAIL_ALLOW_UNICODE_SLUGS = False
 
 # Search
 # https://docs.wagtail.org/en/stable/topics/search/backends.html
@@ -221,7 +224,7 @@ WAGTAILIMAGES_IMAGE_FORM_BASE = "media_importer.forms.CustomImageForm"
 
 # Base URL to use when referring to full URLs within the Wagtail admin backend -
 # e.g. in notification emails. Don't include '/admin' or a trailing slash
-WAGTAILADMIN_BASE_URL = "http://example.com"
+WAGTAILADMIN_BASE_URL = "https://kyrauga.is"
 
 # Allowed file extensions for documents in the document library.
 # This can be omitted to allow all files, but note that this may present a security risk

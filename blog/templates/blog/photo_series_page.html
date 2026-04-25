@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block body_class %}template-photo-series{% endblock %}
+
+{% block content %}
+<main class="ky-page">
+    <section class="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-10 md:px-8 lg:px-12">
+        <header class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
+            <div>
+                <p class="ky-kicker">Series</p>
+                <h1 class="ky-title text-4xl md:text-6xl">{{ page.title }}</h1>
+                {% if page.intro %}
+                <div class="mt-4 max-w-3xl text-base leading-7 text-text-muted">{{ page.intro|richtext }}</div>
+                {% endif %}
+            </div>
+            {% if page.cover_image %}
+            <div class="overflow-hidden rounded-[1.5rem] border border-border bg-surface shadow-soft">
+                {% image page.cover_image fill-700x500 as cover_image %}
+                <img src="{{ cover_image.url }}" alt="{{ page.title }}" class="h-full w-full object-cover">
+            </div>
+            {% endif %}
+        </header>
+
+        {% if page.body %}
+        <section class="prose max-w-none prose-p:text-text prose-strong:text-text">
+            {{ page.body }}
+        </section>
+        {% endif %}
+
+        <section class="flex flex-col gap-5">
+            <div class="flex items-center justify-between">
+                <h2 class="text-2xl font-display text-text">Posts in this series</h2>
+                <span class="ky-badge">{{ posts|length }} posts</span>
+            </div>
+            <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {% for blog_post in posts %}
+                    {% include "blog/includes/blog_page_card.html" %}
+                {% empty %}
+                <div class="ky-surface p-8 text-text-muted">
+                    No posts are linked to this series yet.
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </section>
+</main>
+{% endblock %}

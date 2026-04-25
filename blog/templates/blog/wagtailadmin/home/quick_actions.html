@@ -1,0 +1,17 @@
+{% load i18n wagtailadmin_tags %}
+
+{% if links %}
+{% panel id="admin-quick-actions" heading=_("Quick actions") classname="w-panel--dashboard" %}
+<div class="help-block help-info">
+    {% trans "Shortcuts for common publishing tasks." %}
+</div>
+<div class="w-panel w-flex w-flex-wrap w-px-4">
+    {% for link in links %}
+    <a class="button button-secondary" href="{{ link.url }}">
+        {% icon name=link.icon_name classname="default" %}
+        {{ link.label }}
+    </a>
+    {% endfor %}
+</div>
+{% endpanel %}
+{% endif %}
