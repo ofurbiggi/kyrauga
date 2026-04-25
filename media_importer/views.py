@@ -205,7 +205,7 @@ class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateVie
                     title=file_info.name
                 )
                 img.save()
-                apply_import_metadata(img, file_bytes, file_info)
+                apply_import_metadata(img, file_bytes, file_info, user=request.user)
                 ImportedDropboxAsset.objects.create(
                     dropbox_file_id=file_info.id,
                     dropbox_path_lower=file_info.path_lower,
@@ -347,6 +347,7 @@ class DropboxImportView(AdminAccessMixin, WagtailAdminTemplateMixin, TemplateVie
                     file_info,
                     description_override=request.POST.get(f"description__{index}", draft["description"]).strip(),
                     metadata=self._deserialize_metadata(draft["metadata"]),
+                    user=request.user,
                 )
                 ImportedDropboxAsset.objects.create(
                     dropbox_file_id=file_info.id,

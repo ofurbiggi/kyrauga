@@ -1,23 +1,40 @@
 {% extends "wagtailadmin/generic/edit.html" %}
 {% load wagtailimages_tags wagtailadmin_tags i18n l10n %}
 
+{% block extra_css %}
+{{ block.super }}
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+>
+{% endblock %}
+
 {% block extra_js %}
 {{ block.super }}
 
 <script src="{% versioned_static 'wagtailadmin/js/vendor/jquery.ba-throttle-debounce.min.js' %}"></script>
 <script src="{% versioned_static 'wagtailimages/js/vendor/jquery.Jcrop.min.js' %}"></script>
 <script src="{% versioned_static 'wagtailimages/js/focal-point-chooser.js' %}"></script>
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+></script>
+<script src="{% versioned_static 'js/kyrauga-image-metadata-map.js' %}"></script>
 {% endblock %}
 
 {% block form_content %}
 <div class="w-grid w-grid-cols-1 sm:w-grid-cols-2 w-gap-8 pb-8">
     <div>
         <input type="hidden" value="{{ next }}" name="next">
-        {% for field in form %}
-        {% if field.name == 'file' %}
-        {% include "wagtailimages/images/_file_field.html" %}
-        {% elif field.is_hidden %}
+        {% for field in form.hidden_fields %}
         {{ field }}
+        {% endfor %}
+        {% for field in form.non_metadata_fields %}
+        {% if field.name == "file" %}
+        {% include "wagtailimages/images/_file_field.html" %}
         {% else %}
         {% formattedfield field %}
         {% endif %}
@@ -62,30 +79,43 @@
 
 
     </div>
-    {% with metadata_items=image.metadata_items %}
-    {% if metadata_items %}
     <section class="kyrauga-image-metadata">
         <h2 class="w-label-3">{% trans "Image metadata" %}</h2>
-        <dl class="kyrauga-image-metadata__list">
-            {% for label, value in metadata_items %}
-            <dt>{{ label }}</dt>
-            <dd>{{ value }}</dd>
+        <p class="kyrauga-image-metadata__intro">
+            {% trans "Review or update the imported image metadata. GPS coordinates can be edited manually or by placing the marker on the map." %}
+        </p>
+        <div class="kyrauga-image-metadata__fields">
+            {% for field in form.metadata_fields %}
+            <div class="kyrauga-image-metadata__field">
+                {% formattedfield field %}
+            </div>
             {% endfor %}
-        </dl>
+        </div>
     </section>
-    {% endif %}
-    {% endwith %}
 
-    {% if image.has_gps_coordinates %}
     <section class="kyrauga-image-map">
         <div class="kyrauga-image-map__header">
             <h2 class="w-label-3">{% trans "Capture location" %}</h2>
-            <a href="{{ image.map_link_url }}" target="_blank" rel="noreferrer" class="button button-small button-secondary">
+            <a
+                href="{{ image.map_link_url|default:'#' }}"
+                target="_blank"
+                rel="noreferrer"
+                class="button button-small button-secondary{% if not image.has_gps_coordinates %} disabled{% endif %}"
+                data-kyrauga-gps-target="open-map-link"
+                {% if not image.has_gps_coordinates %}aria-disabled="true"{% endif %}
+            >
                 {% trans "Open in OpenStreetMap" %}
             </a>
         </div>
-        <iframe src="{{ image.map_embed_url }}" class="kyrauga-image-map__frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="{% trans 'Map showing where this image was taken' %}"></iframe>
+        <p class="kyrauga-image-map__help">
+            {% trans "Click to place the marker, drag it to adjust the location, or type coordinates above." %}
+        </p>
+        <div
+            class="kyrauga-image-map__frame"
+            data-kyrauga-gps-map
+            data-latitude="{{ form.gps_latitude.value|default_if_none:'' }}"
+            data-longitude="{{ form.gps_longitude.value|default_if_none:'' }}"
+        ></div>
     </section>
-    {% endif %}
 </div>
 {% endblock %}

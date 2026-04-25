@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
+from django.apps import apps
 from django.utils import timezone
 from PIL import ExifTags, Image as PILImage
 
@@ -12,6 +13,22 @@ from PIL import ExifTags, Image as PILImage
 logger = logging.getLogger(__name__)
 
 DROPBOX_IMPORT_TAG = "Import from Dropbox"
+NORMAL_IMPORT_TAG = "Normal import"
+METADATA_FIELD_NAMES = (
+    "taken_at",
+    "camera_make",
+    "camera_model",
+    "lens_model",
+    "focal_length_mm",
+    "shutter_speed",
+    "aperture",
+    "iso",
+    "gps_latitude",
+    "gps_longitude",
+    "location_name",
+    "location_city",
+    "location_country",
+)
 ICELANDIC_MONTH_NAMES = {
     1: "janúar",
     2: "febrúar",
@@ -28,6 +45,7 @@ ICELANDIC_MONTH_NAMES = {
 }
 
 GPS_TAG = next(key for key, value in ExifTags.TAGS.items() if value == "GPSInfo")
+EXIF_IFD_TAG = next(key for key, value in ExifTags.TAGS.items() if value == "ExifOffset")
 EXIF_TAGS_BY_NAME = {value: key for key, value in ExifTags.TAGS.items()}
 GPS_TAGS_BY_ID = ExifTags.GPSTAGS
 XMP_PATTERNS = {
@@ -63,12 +81,23 @@ XMP_PATTERNS = {
 }
 
 
-def apply_import_metadata(image, file_bytes, file_info, description_override="", metadata=None):
+def apply_import_metadata(
+    image,
+    file_bytes,
+    file_info,
+    description_override="",
+    metadata=None,
+    user=None,
+):
     metadata = metadata or extract_photo_metadata(file_bytes)
-    apply_structured_metadata(image, metadata)
-    image.description = description_override or build_icelandic_description(metadata, file_info=file_info)
-    image.save()
-    image.tags.add(DROPBOX_IMPORT_TAG)
+    update_image_metadata(
+        image,
+        metadata,
+        description=description_override or build_icelandic_description(metadata, file_info=file_info),
+        tag_name=DROPBOX_IMPORT_TAG,
+        history_source="dropbox",
+        user=user,
+    )
     logger.info(
         "Applied import metadata to image",
         extra={
@@ -80,6 +109,25 @@ def apply_import_metadata(image, file_bytes, file_info, description_override="",
             "camera_model": metadata.get("camera_model", ""),
             "lens_model": metadata.get("lens_model", ""),
         },
+    )
+
+
+def apply_uploaded_image_metadata(image, user=None):
+    metadata = extract_photo_metadata(read_image_file_bytes(image))
+    description = ""
+    if not (image.description or "").strip():
+        description = build_icelandic_description(
+            metadata,
+            fallback_text="Innflutt mynd.",
+        )
+
+    update_image_metadata(
+        image,
+        metadata,
+        description=description,
+        tag_name=NORMAL_IMPORT_TAG,
+        history_source="normal",
+        user=user,
     )
 
 
@@ -100,6 +148,86 @@ def apply_structured_metadata(image, metadata):
     image.location_country = metadata.get("location_country", "")
 
 
+def build_image_metadata_snapshot(image):
+    return {
+        "taken_at": image.taken_at.isoformat() if image.taken_at else None,
+        "camera_make": image.camera_make or "",
+        "camera_model": image.camera_model or "",
+        "lens_model": image.lens_model or "",
+        "focal_length_mm": str(image.focal_length_mm) if image.focal_length_mm is not None else None,
+        "shutter_speed": image.shutter_speed or "",
+        "aperture": str(image.aperture) if image.aperture is not None else None,
+        "iso": image.iso,
+        "gps_latitude": str(image.gps_latitude) if image.gps_latitude is not None else None,
+        "gps_longitude": str(image.gps_longitude) if image.gps_longitude is not None else None,
+        "location_name": image.location_name or "",
+        "location_city": image.location_city or "",
+        "location_country": image.location_country or "",
+    }
+
+
+def build_metadata_changes(before, after):
+    changes = {}
+    for field_name in METADATA_FIELD_NAMES:
+        if before.get(field_name) != after.get(field_name):
+            changes[field_name] = {
+                "before": before.get(field_name),
+                "after": after.get(field_name),
+            }
+    return changes
+
+
+def create_metadata_history(image, source, user=None, changes=None):
+    history_model = apps.get_model("media_importer", "ImageMetadataHistory")
+    return history_model.objects.create(
+        image=image,
+        source=source,
+        user=user if getattr(user, "is_authenticated", False) else None,
+        changes=changes or {},
+    )
+
+
+def update_image_metadata(
+    image,
+    metadata,
+    *,
+    description="",
+    tag_name="",
+    history_source=None,
+    user=None,
+):
+    before = build_image_metadata_snapshot(image)
+    apply_structured_metadata(image, metadata)
+    if description:
+        image.description = description
+    image.save(
+        update_fields=[
+            *METADATA_FIELD_NAMES,
+            *(["description"] if description else []),
+        ]
+    )
+
+    if tag_name:
+        image.tags.add(tag_name)
+
+    changes = build_metadata_changes(before, build_image_metadata_snapshot(image))
+    if history_source:
+        create_metadata_history(
+            image,
+            source=history_source,
+            user=user,
+            changes=changes,
+        )
+
+
+def read_image_file_bytes(image):
+    image.file.open("rb")
+    try:
+        return image.file.read()
+    finally:
+        image.file.close()
+
+
 def extract_photo_metadata(file_bytes):
     try:
         with PILImage.open(BytesIO(file_bytes)) as image:
@@ -114,7 +242,9 @@ def extract_photo_metadata(file_bytes):
 
     metadata = {}
 
-    taken_at = _extract_taken_at(exif)
+    exif_ifd = _extract_exif_ifd(exif)
+
+    taken_at = _extract_taken_at(exif, exif_ifd=exif_ifd)
     if taken_at:
         metadata["taken_at"] = taken_at
 
@@ -123,23 +253,23 @@ def extract_photo_metadata(file_bytes):
         ("Model", "camera_model"),
         ("LensModel", "lens_model"),
     ):
-        value = _extract_string(exif.get(EXIF_TAGS_BY_NAME.get(field_name)))
+        value = _extract_string(_get_exif_value(exif, field_name, exif_ifd=exif_ifd))
         if value:
             metadata[metadata_key] = value
 
-    focal_length = _extract_decimal(exif.get(EXIF_TAGS_BY_NAME.get("FocalLength")))
+    focal_length = _extract_decimal(_get_exif_value(exif, "FocalLength", exif_ifd=exif_ifd))
     if focal_length is not None:
         metadata["focal_length_mm"] = focal_length
 
-    aperture = _extract_decimal(exif.get(EXIF_TAGS_BY_NAME.get("FNumber")))
+    aperture = _extract_decimal(_get_exif_value(exif, "FNumber", exif_ifd=exif_ifd))
     if aperture is not None:
         metadata["aperture"] = aperture
 
-    shutter_speed = _extract_shutter_speed(exif)
+    shutter_speed = _extract_shutter_speed(exif, exif_ifd=exif_ifd)
     if shutter_speed:
         metadata["shutter_speed"] = shutter_speed
 
-    iso = _extract_iso(exif)
+    iso = _extract_iso(exif, exif_ifd=exif_ifd)
     if iso is not None:
         metadata["iso"] = iso
 
@@ -162,7 +292,7 @@ def extract_photo_metadata(file_bytes):
     return metadata
 
 
-def build_icelandic_description(metadata, file_info=None):
+def build_icelandic_description(metadata, file_info=None, fallback_text="Innflutt mynd úr Dropbox."):
     segments = []
     taken_at = metadata.get("taken_at")
     gps = metadata.get("gps")
@@ -177,7 +307,7 @@ def build_icelandic_description(metadata, file_info=None):
             f"Skráin var síðast dagsett í Dropbox {format_icelandic_datetime(file_info.server_modified)}."
         )
     else:
-        segments.append("Innflutt mynd úr Dropbox.")
+        segments.append(fallback_text)
 
     location_parts = [part for part in [location_name, location_city, location_country] if part]
     if location_parts:
@@ -207,9 +337,31 @@ def format_icelandic_coordinates(latitude, longitude):
     )
 
 
-def _extract_taken_at(exif):
+def _extract_exif_ifd(exif):
+    try:
+        return exif.get_ifd(EXIF_IFD_TAG)
+    except Exception:
+        return {}
+
+
+def _get_exif_value(exif, field_name, exif_ifd=None):
+    tag_id = EXIF_TAGS_BY_NAME.get(field_name)
+    if tag_id is None:
+        return None
+
+    value = exif.get(tag_id)
+    if value is not None:
+        return value
+
+    if exif_ifd and tag_id in exif_ifd:
+        return exif_ifd.get(tag_id)
+
+    return None
+
+
+def _extract_taken_at(exif, exif_ifd=None):
     for field_name in ("DateTimeOriginal", "DateTimeDigitized"):
-        raw_value = exif.get(EXIF_TAGS_BY_NAME[field_name])
+        raw_value = _get_exif_value(exif, field_name, exif_ifd=exif_ifd)
         parsed = _parse_exif_datetime(raw_value)
         if parsed:
             return parsed
@@ -236,9 +388,9 @@ def _extract_decimal(value):
         return None
 
 
-def _extract_iso(exif):
+def _extract_iso(exif, exif_ifd=None):
     for field_name in ("PhotographicSensitivity", "ISOSpeedRatings"):
-        value = exif.get(EXIF_TAGS_BY_NAME.get(field_name))
+        value = _get_exif_value(exif, field_name, exif_ifd=exif_ifd)
         if value is None:
             continue
         if isinstance(value, (list, tuple)):
@@ -250,14 +402,14 @@ def _extract_iso(exif):
     return None
 
 
-def _extract_shutter_speed(exif):
-    exposure_time = exif.get(EXIF_TAGS_BY_NAME.get("ExposureTime"))
+def _extract_shutter_speed(exif, exif_ifd=None):
+    exposure_time = _get_exif_value(exif, "ExposureTime", exif_ifd=exif_ifd)
     if exposure_time:
         rendered = _format_fraction(exposure_time)
         if rendered:
             return rendered
 
-    shutter_speed_value = exif.get(EXIF_TAGS_BY_NAME.get("ShutterSpeedValue"))
+    shutter_speed_value = _get_exif_value(exif, "ShutterSpeedValue", exif_ifd=exif_ifd)
     if shutter_speed_value is None:
         return ""
 

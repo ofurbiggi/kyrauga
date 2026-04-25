@@ -31,23 +31,24 @@
   );
 }
 
-.kyrauga-image-metadata__list {
-  display: grid;
-  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
-  gap: 0.625rem 1rem;
-  margin: 0;
-}
-
-.kyrauga-image-metadata__list dt {
-  margin: 0;
+.kyrauga-image-metadata__intro {
+  margin: 0 0 1rem;
   color: #4b5563;
-  font-weight: 600;
 }
 
-.kyrauga-image-metadata__list dd {
-  margin: 0;
-  color: #111827;
-  word-break: break-word;
+.kyrauga-image-metadata__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.kyrauga-image-metadata__field .w-field {
+  margin-bottom: 0;
+}
+
+.kyrauga-image-map__help {
+  margin: 0 0 0.875rem;
+  color: #4b5563;
 }
 
 .kyrauga-image-map {
@@ -70,6 +71,11 @@
   display: block;
   width: 100%;
   min-height: 280px;
-  border: 0;
+  border: 1px solid rgba(33, 43, 54, 0.12);
   border-radius: 0.75rem;
+}
+
+.kyrauga-image-map .disabled {
+  pointer-events: none;
+  opacity: 0.55;
 }
