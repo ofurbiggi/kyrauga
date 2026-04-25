@@ -44,6 +44,10 @@
 <body class="{% block body_class %}{% endblock %}">
     {% wagtailuserbar %}
 
+    {% if page and page.specific_class_name != "HomePage" and page.template != "home/home_page.html" %}
+    {% include "includes/site_header.html" %}
+    {% endif %}
+
     {% block content %}{% endblock %}
 
     {# Global javascript #}

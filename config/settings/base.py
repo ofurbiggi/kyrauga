@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "search",
     "blog",
     "media_importer",
+    "wagtail.contrib.settings",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
     "wagtail.embeds",
