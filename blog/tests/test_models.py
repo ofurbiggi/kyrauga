@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -84,6 +85,24 @@ class BlogPageModelTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Served page")
+
+    def test_blog_index_map_response_emits_safe_referrer_policy_and_canonical_tile_config(self):
+        page = self.make_blog_page(
+            title="Mapped post",
+            slug="mapped-post",
+            manual_latitude=Decimal("64.146600"),
+            manual_longitude=Decimal("-21.942600"),
+        )
+
+        response = self.client.get(self.index_page.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Referrer-Policy"), "strict-origin-when-cross-origin")
+        self.assertNotEqual(response.headers.get("Referrer-Policy"), "no-referrer")
+        self.assertContains(response, "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+        self.assertContains(response, 'referrerPolicy: "strict-origin-when-cross-origin"')
+        self.assertNotContains(response, "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+        self.assertContains(response, page.title)
 
     def test_resolved_location_prefers_image_geo_metadata(self):
         image = self.make_image(gps_latitude=Decimal("64.100100"), gps_longitude=Decimal("-21.900200"))
@@ -253,3 +272,13 @@ class BlogPageModelTests(TestCase):
 
         with self.assertRaises(ValidationError):
             page.clean()
+
+
+class BlogMapStaticAssetTests(TestCase):
+    def test_admin_map_script_uses_canonical_osm_tile_url_and_referrer_policy(self):
+        script_path = Path(__file__).resolve().parents[2] / "config" / "static" / "js" / "kyrauga-image-metadata-map.js"
+        script = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("https://tile.openstreetmap.org/{z}/{x}/{y}.png", script)
+        self.assertIn('referrerPolicy: "strict-origin-when-cross-origin"', script)
+        self.assertNotIn("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", script)

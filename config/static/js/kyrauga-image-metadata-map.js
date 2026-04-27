@@ -44,9 +44,10 @@
 
     var map = L.map(mapElement).setView(hasCoordinates ? [latitude, longitude] : defaultCenter, hasCoordinates ? 10 : 5);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
+      referrerPolicy: "strict-origin-when-cross-origin",
     }).addTo(map);
 
     var marker = null;

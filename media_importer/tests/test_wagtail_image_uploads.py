@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -351,6 +352,8 @@ class WagtailImageAdminMetadataEditingTests(TestCase):
         self.assertContains(response, 'data-kyrauga-gps-map')
         self.assertContains(response, 'data-latitude="65.683530"')
         self.assertContains(response, 'data-longitude="-18.087800"')
+        self.assertEqual(response.headers.get("Referrer-Policy"), "strict-origin-when-cross-origin")
+        self.assertNotEqual(response.headers.get("Referrer-Policy"), "no-referrer")
 
     def test_admin_page_renders_blank_map_state_without_crashing(self):
         image = self.create_image()
@@ -361,3 +364,11 @@ class WagtailImageAdminMetadataEditingTests(TestCase):
         self.assertContains(response, 'data-kyrauga-gps-map')
         self.assertContains(response, 'data-latitude=""')
         self.assertContains(response, 'data-longitude=""')
+
+    def test_admin_map_script_uses_canonical_osm_tile_url_and_referrer_policy(self):
+        script_path = Path(__file__).resolve().parents[2] / "config" / "static" / "js" / "kyrauga-image-metadata-map.js"
+        script = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("https://tile.openstreetmap.org/{z}/{x}/{y}.png", script)
+        self.assertIn('referrerPolicy: "strict-origin-when-cross-origin"', script)
+        self.assertNotIn("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", script)
