@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from urllib.parse import urlencode
@@ -42,7 +43,23 @@ class CustomImage(AbstractImage):
     location_city = models.CharField(max_length=255, blank=True)
     location_country = models.CharField(max_length=255, blank=True)
 
-    admin_form_fields = list(WagtailImage.admin_form_fields)
+    metadata_field_names = (
+        "taken_at",
+        "camera_make",
+        "camera_model",
+        "lens_model",
+        "focal_length_mm",
+        "shutter_speed",
+        "aperture",
+        "iso",
+        "gps_latitude",
+        "gps_longitude",
+        "location_name",
+        "location_city",
+        "location_country",
+    )
+
+    admin_form_fields = list(WagtailImage.admin_form_fields) + list(metadata_field_names)
 
     def metadata_items(self):
         items = []
@@ -161,3 +178,39 @@ class ImportedDropboxAsset(models.Model):
 
     def __str__(self):
         return self.dropbox_path_display
+
+
+class ImageMetadataHistory(models.Model):
+    SOURCE_EXIF = "exif"
+    SOURCE_DROPBOX = "dropbox"
+    SOURCE_NORMAL = "normal"
+    SOURCE_MANUAL = "manual"
+
+    SOURCE_CHOICES = [
+        (SOURCE_EXIF, "EXIF"),
+        (SOURCE_DROPBOX, "Dropbox"),
+        (SOURCE_NORMAL, "Normal"),
+        (SOURCE_MANUAL, "Manual"),
+    ]
+
+    image = models.ForeignKey(
+        get_image_model_string(),
+        on_delete=models.CASCADE,
+        related_name="metadata_history",
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="image_metadata_history_entries",
+    )
+    changes = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-timestamp", "-id"]
+
+    def __str__(self):
+        return f"Metadata history for {self.image_id} from {self.source}"

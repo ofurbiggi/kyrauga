@@ -45,3 +45,10 @@ class CustomImageFormTests(TestCase):
         form = form_class()
 
         self.assertIsInstance(form.fields["description"].widget, forms.Textarea)
+
+    def test_metadata_fields_are_available_on_custom_image_form(self):
+        form_class = get_image_form(CustomImage)
+        form = form_class()
+
+        for field_name in CustomImage.metadata_field_names:
+            self.assertIn(field_name, form.fields)

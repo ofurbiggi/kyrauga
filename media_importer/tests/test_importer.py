@@ -11,7 +11,7 @@ from PIL import Image as PILImage
 
 from wagtail.images import get_image_model
 
-from media_importer.models import DropboxAuthState
+from media_importer.models import DropboxAuthState, ImageMetadataHistory
 from media_importer.services.importer import (
     build_icelandic_description,
     extract_photo_metadata,
@@ -78,6 +78,66 @@ class ImporterMetadataTests(TestCase):
         metadata = extract_photo_metadata(b"fake-image-bytes")
 
         self.assertEqual(metadata, {})
+
+    @patch("media_importer.services.importer.PILImage.open")
+    def test_extract_photo_metadata_reads_capture_camera_and_exposure_fields(self, mock_open):
+        fake_exif = FakeExif(
+            values={
+                36867: "2026:04:09 22:30:03",
+                271: "FUJIFILM",
+                272: "X-T4",
+                42036: "XF23mmF2 R WR",
+                37386: (23, 1),
+                33437: (45, 10),
+                33434: (1, 160),
+                34855: 1600,
+            }
+        )
+        mock_image = mock_open.return_value.__enter__.return_value
+        mock_image.getexif.return_value = fake_exif
+
+        metadata = extract_photo_metadata(b"fake-image-bytes")
+
+        self.assertEqual(metadata["taken_at"].year, 2026)
+        self.assertEqual(metadata["camera_make"], "FUJIFILM")
+        self.assertEqual(metadata["camera_model"], "X-T4")
+        self.assertEqual(metadata["lens_model"], "XF23mmF2 R WR")
+        self.assertEqual(str(metadata["focal_length_mm"]), "23.00")
+        self.assertEqual(metadata["shutter_speed"], "1/160 sek")
+        self.assertEqual(str(metadata["aperture"]), "4.50")
+        self.assertEqual(metadata["iso"], 1600)
+
+    @patch("media_importer.services.importer.PILImage.open")
+    def test_extract_photo_metadata_reads_nested_exif_ifd_fields(self, mock_open):
+        fake_exif = FakeExif(
+            values={
+                271: "FUJIFILM",
+                272: "X-T4",
+            },
+            ifd_values={
+                34665: {
+                    36867: "2026:04:23 10:09:15",
+                    42036: "21.0 mm",
+                    37386: (21, 1),
+                    33437: (10, 10),
+                    33434: (1, 1000),
+                    34855: 640,
+                }
+            },
+        )
+        mock_image = mock_open.return_value.__enter__.return_value
+        mock_image.getexif.return_value = fake_exif
+
+        metadata = extract_photo_metadata(b"fake-image-bytes")
+
+        self.assertEqual(metadata["taken_at"].year, 2026)
+        self.assertEqual(metadata["camera_make"], "FUJIFILM")
+        self.assertEqual(metadata["camera_model"], "X-T4")
+        self.assertEqual(metadata["lens_model"], "21.0 mm")
+        self.assertEqual(str(metadata["focal_length_mm"]), "21.00")
+        self.assertEqual(metadata["shutter_speed"], "1/1000 sek")
+        self.assertEqual(str(metadata["aperture"]), "1.00")
+        self.assertEqual(metadata["iso"], 640)
 
     def test_extract_xmp_metadata_reads_lightroom_lens_and_capture_date(self):
         file_bytes = b"""
@@ -228,6 +288,9 @@ class ImporterViewMetadataTests(TestCase):
         self.assertEqual(image.shutter_speed, "1/160 sek")
         self.assertEqual(str(image.aperture), "4.50")
         self.assertEqual(image.iso, 1600)
+        history = image.metadata_history.get()
+        self.assertEqual(history.source, ImageMetadataHistory.SOURCE_DROPBOX)
+        self.assertEqual(history.user, self.user)
 
     def _build_test_image_bytes(self):
         buffer = BytesIO()
