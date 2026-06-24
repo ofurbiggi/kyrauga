@@ -1,0 +1,331 @@
+{% load wagtailimages_tags %}
+
+{% if pinned_items %}
+  {% if has_wrapper|default_if_none:True %}
+    <section class="relative flex h-fit w-screen flex-col justify-center gap-6 overflow-hidden py-20 sm:h-fit">
+    {% endif %}
+    {% with pinned_items|length as pinned_count %}
+      <div class="z-10 w-full self-center">
+        <div class="relative h-[min(72vh,42rem)] min-h-[28rem] cursor-grab touch-pan-y select-none overflow-hidden outline-none active:cursor-grabbing sm:min-h-[34rem]"
+             role="region"
+             aria-label="Pinned blog posts"
+             tabindex="0"
+             data-pinned-carousel>
+          {% for item in pinned_items %}
+            {% if item.is_blog_page %}
+              {% image item.pinned_object.featured_image fill-1800x1200 as pinned_background %}
+              <div class="ky-pinned-wheel-slide absolute left-1/2 top-[42%] w-[calc(100vw_-_3rem)] sm:w-[min(66vw,50vh)]"
+                   data-pinned-slide
+                   data-pinned-index="{{ forloop.counter0 }}"
+                   data-pinned-background-url="{{ pinned_background.url }}">
+                {% include "blog/includes/blog_page_card.html" with blog_post=item.pinned_object pinned=True %}
+              </div>
+            {% elif item.is_series_page %}
+              {% if item.pinned_object.cover_image %}
+                {% image item.pinned_object.cover_image fill-1800x1200 as pinned_background %}
+              {% endif %}
+              <div class="ky-pinned-wheel-slide absolute left-1/2 top-[42%] w-[calc(100vw_-_3rem)] sm:w-[min(66vw,50vh)]"
+                   data-pinned-slide
+                   data-pinned-index="{{ forloop.counter0 }}"
+                   {% if item.pinned_object.cover_image %}data-pinned-background-url="{{ pinned_background.url }}"{% endif %}>
+                {% include "blog/includes/photo_series_card.html" with series_page=item.pinned_object pinned=True %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        {% if pinned_count > 1 %}
+          <div class="mt-6 flex justify-center gap-3">
+            <button type="button"
+                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-text text-2xl leading-none text-text transition hover:bg-text hover:text-bg focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-brand-soft"
+                    aria-label="Show previous pinned item"
+                    data-pinned-carousel-prev>
+              <span aria-hidden="true">&larr;</span>
+            </button>
+            <button type="button"
+                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-text text-2xl leading-none text-text transition hover:bg-text hover:text-bg focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-brand-soft"
+                    aria-label="Show next pinned item"
+                    data-pinned-carousel-next>
+              <span aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+        {% endif %}
+      </div>
+    {% endwith %}
+    {% if has_wrapper|default:True %}</section>{% endif %}
+
+  <script>
+  (() => {
+    const carousels = document.querySelectorAll("[data-pinned-carousel]:not([data-pinned-carousel-ready])");
+
+    carousels.forEach((carousel) => {
+      carousel.dataset.pinnedCarouselReady = "true";
+
+      const slides = Array.from(carousel.querySelectorAll("[data-pinned-slide]"));
+      const carouselRoot = carousel.closest("section") || carousel.parentElement;
+      const prevButton = carouselRoot?.querySelector("[data-pinned-carousel-prev]");
+      const nextButton = carouselRoot?.querySelector("[data-pinned-carousel-next]");
+      let activeSlideIndex = 0;
+      let dragStartX;
+      let dragPointerId;
+      let hasDragged = false;
+      let suppressClickUntil = 0;
+      let wheelDeltaX = 0;
+      let wheelResetTimeout;
+      let wheelNavigationLocked = false;
+
+      const normalizeSlideIndex = (index) => {
+        if (!slides.length) {
+          return 0;
+        }
+
+        return (index + slides.length) % slides.length;
+      };
+
+      // Signed distance on a circular list, so slide 0 is next to the final slide.
+      const getCircularOffset = (index) => {
+        const slideCount = slides.length;
+        let offset = index - activeSlideIndex;
+        const halfSlideCount = slideCount / 2;
+
+        if (offset > halfSlideCount) {
+          offset -= slideCount;
+        } else if (offset < -halfSlideCount) {
+          offset += slideCount;
+        }
+
+        return offset;
+      };
+
+      const getSlidePosition = (offset) => {
+        const absoluteOffset = Math.abs(offset);
+        const direction = Math.sign(offset);
+        const isMobile = window.matchMedia("(max-width: 639px)").matches;
+
+        if (absoluteOffset === 0) {
+          return { x: "0rem", y: "0rem", rotate: "0deg", scale: 1, z: 50, opacity: 1 };
+        }
+
+        if (absoluteOffset === 1) {
+          return {
+            x: `${direction * (isMobile ? 56 : 40)}vw`,
+            y: isMobile ? "3.5rem" : "4rem",
+            rotate: `${direction * (isMobile ? 12 : 18)}deg`,
+            scale: isMobile ? 0.72 : 0.78,
+            z: 40,
+            opacity: 0.76,
+          };
+        }
+
+        if (absoluteOffset === 2) {
+          return {
+            x: `${direction * (isMobile ? 88 : 62)}vw`,
+            y: isMobile ? "8rem" : "12rem",
+            rotate: `${direction * (isMobile ? 22 : 34)}deg`,
+            scale: isMobile ? 0.48 : 0.58,
+            z: 30,
+            opacity: isMobile ? 0 : 0.34,
+          };
+        }
+
+        return {
+          x: `${direction * (isMobile ? 112 : 92)}vw`,
+          y: "16rem",
+          rotate: `${direction * 44}deg`,
+          scale: 0.42,
+          z: 10,
+          opacity: 0,
+        };
+      };
+
+      const updateSlideLinks = (slide, isActive) => {
+        slide.querySelectorAll("a, button, input, select, textarea, [tabindex]").forEach((element) => {
+          if (isActive) {
+            element.removeAttribute("tabindex");
+          } else {
+            element.setAttribute("tabindex", "-1");
+          }
+        });
+      };
+
+      const renderSlides = () => {
+        slides.forEach((slide, index) => {
+          const offset = getCircularOffset(index);
+          const position = getSlidePosition(offset);
+          const isActive = offset === 0;
+          const isNeighbor = Math.abs(offset) === 1;
+
+          slide.style.setProperty("--x", position.x);
+          slide.style.setProperty("--y", position.y);
+          slide.style.setProperty("--rotate", position.rotate);
+          slide.style.setProperty("--scale", position.scale);
+          slide.style.setProperty("--z", position.z);
+          slide.style.setProperty("--opacity", position.opacity);
+          slide.dataset.active = isActive ? "true" : "false";
+          slide.dataset.neighbor = isNeighbor ? "true" : "false";
+          slide.setAttribute("aria-current", isActive ? "true" : "false");
+          slide.setAttribute("aria-hidden", isActive || isNeighbor ? "false" : "true");
+          updateSlideLinks(slide, isActive);
+        });
+      };
+
+      const setActiveSlide = (index, focusCarousel = false) => {
+        activeSlideIndex = normalizeSlideIndex(index);
+        renderSlides();
+
+        if (focusCarousel) {
+          carousel.focus({ preventScroll: true });
+        }
+      };
+
+      const showPreviousSlide = () => {
+        setActiveSlide(activeSlideIndex - 1, true);
+      };
+
+      const showNextSlide = () => {
+        setActiveSlide(activeSlideIndex + 1, true);
+      };
+
+      prevButton?.addEventListener("click", () => {
+        showPreviousSlide();
+      });
+
+      nextButton?.addEventListener("click", () => {
+        showNextSlide();
+      });
+
+      slides.forEach((slide, index) => {
+        slide.addEventListener("click", (event) => {
+          if (Date.now() < suppressClickUntil) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+
+          if (index === activeSlideIndex) {
+            return;
+          }
+
+          event.preventDefault();
+          setActiveSlide(index, true);
+        });
+      });
+
+      carousel.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          showPreviousSlide();
+        } else if (event.key === "ArrowRight") {
+          event.preventDefault();
+          showNextSlide();
+        }
+      });
+
+      carousel.addEventListener("wheel", (event) => {
+        const horizontalDelta = event.shiftKey ? event.deltaY : event.deltaX;
+        const isHorizontalGesture = Math.abs(horizontalDelta) > Math.abs(event.deltaY) || event.shiftKey;
+
+        if (!isHorizontalGesture || Math.abs(horizontalDelta) < 4) {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (wheelNavigationLocked) {
+          return;
+        }
+
+        wheelDeltaX += horizontalDelta;
+        window.clearTimeout(wheelResetTimeout);
+        wheelResetTimeout = window.setTimeout(() => {
+          wheelDeltaX = 0;
+        }, 160);
+
+        if (Math.abs(wheelDeltaX) < 72) {
+          return;
+        }
+
+        wheelNavigationLocked = true;
+        if (wheelDeltaX > 0) {
+          showNextSlide();
+        } else {
+          showPreviousSlide();
+        }
+
+        wheelDeltaX = 0;
+        window.setTimeout(() => {
+          wheelNavigationLocked = false;
+        }, 420);
+      }, { passive: false });
+
+      carousel.addEventListener("dragstart", (event) => {
+        event.preventDefault();
+      });
+
+      carousel.addEventListener("pointerdown", (event) => {
+        if (!event.isPrimary || event.button > 0) {
+          return;
+        }
+
+        dragStartX = event.clientX;
+        dragPointerId = event.pointerId;
+        hasDragged = false;
+        carousel.dataset.dragging = "false";
+      });
+
+      carousel.addEventListener("pointermove", (event) => {
+        if (dragPointerId !== event.pointerId || dragStartX === undefined) {
+          return;
+        }
+
+        if (Math.abs(event.clientX - dragStartX) > 8) {
+          hasDragged = true;
+          carousel.dataset.dragging = "true";
+        }
+      });
+
+      const finishPointerGesture = (event) => {
+        if (dragPointerId !== event.pointerId || dragStartX === undefined) {
+          return;
+        }
+
+        const dragDistance = event.clientX - dragStartX;
+        const shouldNavigate = hasDragged && Math.abs(dragDistance) >= 48;
+        dragStartX = undefined;
+        dragPointerId = undefined;
+        hasDragged = false;
+        carousel.dataset.dragging = "false";
+
+        if (!shouldNavigate) {
+          return;
+        }
+
+        suppressClickUntil = Date.now() + 350;
+        if (dragDistance > 0) {
+          showPreviousSlide();
+        } else {
+          showNextSlide();
+        }
+      };
+
+      carousel.addEventListener("pointerup", finishPointerGesture);
+      window.addEventListener("pointerup", finishPointerGesture);
+
+      carousel.addEventListener("pointercancel", (event) => {
+        if (dragPointerId === event.pointerId) {
+          dragStartX = undefined;
+          dragPointerId = undefined;
+          hasDragged = false;
+          carousel.dataset.dragging = "false";
+        }
+      });
+
+      window.addEventListener("resize", () => {
+        renderSlides();
+      });
+
+      renderSlides();
+    });
+  })();
+  </script>
+{% endif %}

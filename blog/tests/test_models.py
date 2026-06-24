@@ -73,6 +73,17 @@ class BlogPageModelTests(TestCase):
         request.site = self.site
         return self.index_page.get_context(request)
 
+    def make_chronological_blog_pages(self, count):
+        base_published_at = timezone.make_aware(datetime(2026, 1, 1, 12, 0, 0))
+        pages = []
+        for number in range(count):
+            page = self.make_blog_page(title=f"Post {number}", slug=f"post-{number}")
+            BlogPage.objects.filter(pk=page.pk).update(
+                first_published_at=base_published_at + timezone.timedelta(days=number)
+            )
+            pages.append(BlogPage.objects.get(pk=page.pk))
+        return pages
+
     def test_blog_page_creation(self):
         page = self.make_blog_page()
         self.assertEqual(page.featured_image.title, "Test image")
@@ -125,6 +136,46 @@ class BlogPageModelTests(TestCase):
         self.assertEqual(page.resolved_longitude, Decimal("-19.654321"))
         self.assertTrue(page.has_location)
 
+    def test_coordinates_display_formats_degrees_and_minutes(self):
+        page = self.make_blog_page(
+            manual_latitude=Decimal("64.146600"),
+            manual_longitude=Decimal("-21.942600"),
+        )
+
+        self.assertEqual(page.coordinates_display, f"64{chr(176)}09'N x 21{chr(176)}57'W")
+
+    def test_image_metadata_display_uses_featured_image_fields(self):
+        image = self.make_image(
+            camera_make="FUJIFILM",
+            camera_model="X-T4",
+            shutter_speed="1/160 sek",
+            iso=1600,
+            aperture=Decimal("4.50"),
+            focal_length_mm=Decimal("23.00"),
+        )
+        page = self.make_blog_page(featured_image=image)
+
+        self.assertEqual(page.camera_display, "FUJIFILM X-T4")
+        self.assertEqual(page.exposure_display, "1/160 sek")
+        self.assertEqual(page.iso_display, "1600")
+        self.assertEqual(page.aperture_display, "f/4.5")
+        self.assertEqual(page.focal_length_display, "23 mm")
+
+    def test_image_metadata_display_returns_empty_strings_for_missing_metadata(self):
+        page = self.make_blog_page()
+
+        self.assertEqual(page.camera_display, "")
+        self.assertEqual(page.exposure_display, "")
+        self.assertEqual(page.iso_display, "")
+        self.assertEqual(page.aperture_display, "")
+        self.assertEqual(page.focal_length_display, "")
+
+    def test_camera_display_allows_partial_camera_metadata(self):
+        image = self.make_image(camera_model="X-T4")
+        page = self.make_blog_page(featured_image=image)
+
+        self.assertEqual(page.camera_display, "X-T4")
+
     def test_blog_page_can_belong_to_multiple_series(self):
         page = self.make_blog_page()
         first_series = self.make_series(title="North", slug="north")
@@ -170,6 +221,41 @@ class BlogPageModelTests(TestCase):
         context = blog_page.get_context(self.request_factory.get("/blog/preview/"))
 
         self.assertEqual(list(context["related_series"]), [first_series, second_series])
+
+    def test_other_blog_posts_returns_three_newer_and_three_older_posts(self):
+        pages = self.make_chronological_blog_pages(8)
+
+        other_posts = pages[4].get_other_blog_posts()
+
+        self.assertEqual([post.title for post in other_posts], ["Post 7", "Post 6", "Post 5", "Post 3", "Post 2", "Post 1"])
+
+    def test_other_blog_posts_for_latest_post_returns_previous_six_posts(self):
+        pages = self.make_chronological_blog_pages(8)
+
+        other_posts = pages[7].get_other_blog_posts()
+
+        self.assertEqual([post.title for post in other_posts], ["Post 6", "Post 5", "Post 4", "Post 3", "Post 2", "Post 1"])
+
+    def test_other_blog_posts_for_second_latest_post_fills_from_older_posts(self):
+        pages = self.make_chronological_blog_pages(8)
+
+        other_posts = pages[6].get_other_blog_posts()
+
+        self.assertEqual([post.title for post in other_posts], ["Post 7", "Post 5", "Post 4", "Post 3", "Post 2", "Post 1"])
+
+    def test_other_blog_posts_for_oldest_post_returns_next_six_posts(self):
+        pages = self.make_chronological_blog_pages(8)
+
+        other_posts = pages[0].get_other_blog_posts()
+
+        self.assertEqual([post.title for post in other_posts], ["Post 6", "Post 5", "Post 4", "Post 3", "Post 2", "Post 1"])
+
+    def test_blog_page_context_includes_other_posts(self):
+        pages = self.make_chronological_blog_pages(3)
+
+        context = pages[1].get_context(self.request_factory.get("/blog/post-1/"))
+
+        self.assertEqual([post.title for post in context["other_posts"]], ["Post 2", "Post 0"])
 
     def test_index_excludes_pinned_blog_pages_from_automatic_list(self):
         pinned_page = self.make_blog_page(title="Pinned", slug="pinned")

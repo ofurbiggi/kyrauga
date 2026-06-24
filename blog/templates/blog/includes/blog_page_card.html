@@ -1,6 +1,64 @@
-{% load wagtailimages_tags %}
+{% load i18n wagtailimages_tags %}
 
-<article class="group overflow-hidden rounded-[1.5rem] border border-border bg-surface shadow-soft transition duration-200 hover:-translate-y-1 hover:shadow-card">
+<article class="group transition duration-200 rounded-full aspect-square">
+    <a href="{{ blog_post.url }}" class="block relative group w-full h-full">
+        {% image blog_post.featured_image fill-900x900-c100 as card_image %}
+        <div class="absolute inset-[8%] overflow-hidden rounded-full object-cover transition-all drop-shadow-2xl">
+            <img src="{{ card_image.url }}"
+                 alt="{{ blog_post.best_alt_text }}"
+                 class="ky-focus-image absolute inset-0 h-full w-full object-cover">
+            <div class="ky-viewfinder pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150"
+                 aria-hidden="true">
+                <div class="relative h-24 w-24 rounded-full border border-white/80 shadow-[0_0_18px_rgba(102,241,210,0.35)] md:h-32 md:w-32">
+                    <span class="absolute left-1/2 top-1/2 h-2/3 w-2/3 -translate-x-1/2 -translate-y-1/2 rounded-full border bg-black/10 overflow-hidden"></span>
+                    <span class="absolute left-1/2 top-1/3 h-1/3 w-px -translate-x-1/2 bg-white/70"></span>
+                    <span class="absolute left-1/3 top-1/2 h-px w-1/3 -translate-y-1/2 bg-white/70"></span>
+
+                </div>
+            </div>
+        </div>
+        {% comment %} <div class="absolute inset-0 bg-gradient-to-t from-brand-strong via-brand-strong/80 to-brand-strong/25 opacity-0 group-hover:opacity-100 transition-all">
+        </div> {% endcomment %}
+
+        <svg class="pointer-events-none absolute inset-0 z-10 h-full w-full text-text font-display"
+             viewBox="-24 -24 348 348"
+             aria-hidden="true"
+             focusable="false">
+            <defs>
+            <path id="blog-card-circle-path-{{ blog_post.id }}" d="M 150,156 m -160,0 a 160,160 0 1,1 320,0 a 160,160 0 1,1 -320,0" />
+            <path id="blog-card-bottom-path-{{ blog_post.id }}" d="M -10,150 a 160,160 0 0,0 320,0" />
+            <path id="blog-card-left-path-{{ blog_post.id }}" d="M 150,294 a 144,144 0 0,1 0,-288" />
+            </defs>
+            <text fill="currentColor" font-size="13" font-weight="700" letter-spacing="3.6">
+            {% if blog_post.has_location %}
+                <textPath href="#blog-card-circle-path-{{ blog_post.id }}" startOffset="25%" text-anchor="middle">
+                {{ blog_post.coordinates_display }}
+                </textPath>
+            {% else %}
+                <textPath href="#blog-card-circle-path-{{ blog_post.id }}" startOffset="25%" text-anchor="middle">
+                X
+                </textPath>
+            {% endif %}
+            {% if blog_post.display_date %}
+                <textPath href="#blog-card-bottom-path-{{ blog_post.id }}" startOffset="50%" text-anchor="middle">
+                {% language "is" %}
+                    vika {{ blog_post.display_date|date:"W Y" }}{% endlanguage %}</textPath>
+                {% endif %}
+                </text>
+                <text class="ky-af-lock" fill="#e6a34a" font-size="10.5" font-weight="700" letter-spacing="2.8">
+                <textPath href="#blog-card-left-path-{{ blog_post.id }}" startOffset="50%" text-anchor="middle">
+                AF locked
+                </textPath>
+                </text>
+            </svg>
+            {% comment %} <div class="space-y-3 p-5 absolute top-1/2 -translate-y-1/2 w-full text-center opacity-0 group-hover:opacity-100 transition-all">
+            <h3 class="text-2xl font-display text-white">{{ blog_post.title }}</h3>
+            <p class="text-sm font-semibold uppercase tracking-[0.12em] text-white">{{ blog_post.display_date|date:"Y" }}</p>
+            </div> {% endcomment %}
+        </a>
+    </article>
+
+    {% comment %} <article class="group overflow-hidden rounded-[1.5rem] border border-border bg-surface shadow-soft transition duration-200 hover:-translate-y-1 hover:shadow-card">
     <a href="{{ blog_post.url }}" class="block">
         <div class="overflow-hidden">
             {% image blog_post.featured_image fill-900x700 as card_image %}
@@ -17,4 +75,4 @@
             {% endif %}
         </div>
     </a>
-</article>
+    </article> {% endcomment %}

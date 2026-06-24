@@ -1,162 +1,164 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags wagtailimages_tags %}
+{% load wagtailcore_tags wagtailimages_tags i18n %}
 
-{% block body_class %}template-blog-index{% endblock %}
+{% block body_class %}
+  template-blog-index
+{% endblock body_class %}
 
 {% block extra_css %}
-{{ block.super }}
-{% if map_points %}
-<link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
->
-{% endif %}
+  {{ block.super }}
+  {% if map_points %}
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin="">
+  {% endif %}
 {% endblock %}
 
 {% block content %}
-<main class="ky-page">
-    <section class="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-10 md:px-8 lg:px-12">
-        <header class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div class="max-w-3xl">
-                <p class="ky-kicker">Blog</p>
-                <h1 class="ky-title text-4xl md:text-6xl">{{ page.title }}</h1>
-                {% if page.intro %}
-                <div class="mt-4 max-w-2xl text-base leading-7 text-text-muted">{{ page.intro|richtext }}</div>
-                {% endif %}
-            </div>
-            {% if map_points %}
-            <button type="button" class="ky-button-secondary" data-blog-map-toggle>
-                Open map
-            </button>
-            {% endif %}
-        </header>
+  <main class="ky-page">
+    {% comment %} <header class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div class="max-w-3xl">
+        <p class="ky-kicker">Blog</p>
+        <h1 class="ky-title text-4xl md:text-6xl">{{ page.title }}</h1>
+        {% if page.intro %}
+          <div class="mt-4 max-w-2xl text-base leading-7 text-text-muted">{{ page.intro|richtext }}</div>
+        {% endif %}
+      </div>
+      {% if map_points %}<button type="button" class="ky-button-secondary" data-blog-map-toggle>Open map</button>{% endif %}
+    </header> {% endcomment %}
+
+    <section class="relative flex h-fit w-screen flex-col justify-center gap-6 overflow-hidden bg-bg-soft py-20 sm:h-fit">
+      {% include "blog/includes/pinned_items_carousel.html" with pinned_items=pinned_items %}
+    </section>
+    <section class="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-10 md:px-8 lg:px-12 pt-20">
+
+      <section class="flex flex-col gap-5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-display text-text">Færslur í tímaröð</h2>
+          <span class="text-sm text-text-muted">{{ blog_posts.paginator.count }} samtals</span>
+        </div>
 
         <section class="ky-surface p-5 md:p-6">
-            <form method="get" class="grid gap-4 md:grid-cols-4">
-                <label class="flex flex-col gap-2 text-sm font-semibold text-text-muted">
-                    Year
-                    <select name="year" class="rounded-md border border-border bg-white px-3 py-2 text-text">
-                        <option value="">All years</option>
-                        {% for year in available_filters.years %}
-                        <option value="{{ year }}"{% if active_filters.year == year|stringformat:"s" %} selected{% endif %}>{{ year }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label class="flex flex-col gap-2 text-sm font-semibold text-text-muted">
-                    Month
-                    <select name="month" class="rounded-md border border-border bg-white px-3 py-2 text-text">
-                        <option value="">All months</option>
-                        {% for month in available_filters.months %}
-                        <option value="{{ month }}"{% if active_filters.month == month|stringformat:"s" %} selected{% endif %}>{{ month }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label class="flex flex-col gap-2 text-sm font-semibold text-text-muted">
-                    Series
-                    <select name="series" class="rounded-md border border-border bg-white px-3 py-2 text-text">
-                        <option value="">All series</option>
-                        {% for series in available_filters.series %}
-                        <option value="{{ series.slug }}"{% if active_filters.series == series.slug or active_filters.series == series.id|stringformat:"s" %} selected{% endif %}>
-                            {{ series.title }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <div class="flex items-end gap-3">
-                    <button type="submit" class="ky-button-primary">Apply filters</button>
-                    <a href="{{ page.url }}" class="ky-button-secondary">Reset</a>
-                </div>
-            </form>
+          <form method="get" class="grid gap-4 md:grid-cols-4">
+            <label class="flex flex-col gap-2 text-sm font-semibold text-text-muted">
+              Ár
+              <select name="year"
+                      class="rounded-md border border-border bg-white px-3 py-2 text-text">
+                <option value="">Allt</option>
+                {% for year in available_filters.years %}
+                  {% if active_filters.year == year|stringformat:"s" %}
+                    <option value="{{ year }}" selected>{{ year }}</option>
+                  {% else %}
+                    <option value="{{ year }}">{{ year }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </label>
+            <label class="flex flex-col gap-2 text-sm font-semibold text-text-muted">
+              Mánuður
+              <select name="month"
+                      class="rounded-md border border-border bg-white px-3 py-2 text-text">
+                <option value="">Allt</option>
+                {% language "is" %}
+                  {% for month in available_filters.months %}
+                    {% if active_filters.month == month|stringformat:"s" %}
+                      <option value="{{ month }}" selected>
+                        {% if month == 1 %}janúar{% elif month == 2 %}febrúar{% elif month == 3 %}mars{% elif month == 4 %}apríl{% elif month == 5 %}maí{% elif month == 6 %}júní{% elif month == 7 %}júlí{% elif month == 8 %}ágúst{% elif month == 9 %}september{% elif month == 10 %}október{% elif month == 11 %}nóvember{% elif month == 12 %}desember{% endif %}
+                      </option>
+                    {% else %}
+                      <option value="{{ month }}">
+                        {% if month == 1 %}janúar{% elif month == 2 %}febrúar{% elif month == 3 %}mars{% elif month == 4 %}apríl{% elif month == 5 %}maí{% elif month == 6 %}júní{% elif month == 7 %}júlí{% elif month == 8 %}ágúst{% elif month == 9 %}september{% elif month == 10 %}október{% elif month == 11 %}nóvember{% elif month == 12 %}desember{% endif %}
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                {% endlanguage %}
+              </select>
+            </label>
+            <label class="flex flex-col gap-2 text-sm font-semibold text-text-muted">
+              Seríur
+              <select name="series"
+                      class="rounded-md border border-border bg-white px-3 py-2 text-text">
+                <option value="">Allar seríur</option>
+                {% for series in available_filters.series %}
+                  {% if active_filters.series == series.slug or active_filters.series == series.id|stringformat:"s" %}
+                    <option value="{{ series.slug }}" selected>{{ series.title }}</option>
+                  {% else %}
+                    <option value="{{ series.slug }}">{{ series.title }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </label>
+            <div class="flex items-end gap-3">
+              <button type="submit" class="ky-button-primary">Sía</button>
+              <a href="{{ page.url }}" class="ky-button-secondary">Endursetja</a>
+            </div>
+          </form>
         </section>
 
-        {% if pinned_items %}
-        <section class="flex flex-col gap-5">
-            <div class="flex items-center justify-between">
-                <h2 class="text-2xl font-display text-text">Pinned</h2>
-                <span class="ky-badge">Editor picks</span>
-            </div>
-            <div class="grid gap-6 lg:grid-cols-2">
-                {% for item in pinned_items %}
-                    {% if item.is_blog_page %}
-                        {% include "blog/includes/blog_page_card.html" with blog_post=item.pinned_object pinned=True %}
-                    {% elif item.is_series_page %}
-                        {% include "blog/includes/photo_series_card.html" with series_page=item.pinned_object pinned=True %}
-                    {% endif %}
-                {% endfor %}
-            </div>
-        </section>
+        {% if map_points %}
+          <button type="button" class="ky-button-secondary" data-blog-map-toggle>Opna kort</button>
         {% endif %}
 
-        <section class="flex flex-col gap-5">
-            <div class="flex items-center justify-between">
-                <h2 class="text-2xl font-display text-text">Latest posts</h2>
-                <span class="text-sm text-text-muted">{{ blog_posts.paginator.count }} total</span>
-            </div>
+        {% if blog_posts %}
+          <div class="grid gap-4 sm:gap-2 sm:grid-cols-2 md:grid-cols-3">
+            {% for blog_post in blog_posts %}
+              {% include "blog/includes/blog_page_card.html" %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="ky-surface p-8 text-text-muted">Engar færslur passa við núverandi síur.</div>
+        {% endif %}
 
-            {% if blog_posts %}
-            <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {% for blog_post in blog_posts %}
-                    {% include "blog/includes/blog_page_card.html" %}
-                {% endfor %}
+        {% if blog_posts.paginator.num_pages > 1 %}
+          <nav class="flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-text-muted">
+            <div>Page {{ blog_posts.number }} of {{ blog_posts.paginator.num_pages }}</div>
+            <div class="flex gap-3">
+              {% if blog_posts.has_previous %}
+                <a class="ky-button-secondary"
+                   href="?page={{ blog_posts.previous_page_number }}{% if active_filters.year %}&year={{ active_filters.year }}{% endif %}{% if active_filters.month %}&month={{ active_filters.month }}{% endif %}{% if active_filters.series %}&series={{ active_filters.series }}{% endif %}">Previous</a>
+              {% endif %}
+              {% if blog_posts.has_next %}
+                <a class="ky-button-secondary"
+                   href="?page={{ blog_posts.next_page_number }}{% if active_filters.year %}&year={{ active_filters.year }}{% endif %}{% if active_filters.month %}&month={{ active_filters.month }}{% endif %}{% if active_filters.series %}&series={{ active_filters.series }}{% endif %}">Next</a>
+              {% endif %}
             </div>
-            {% else %}
-            <div class="ky-surface p-8 text-text-muted">
-                No posts match the current filters.
-            </div>
-            {% endif %}
-
-            {% if blog_posts.paginator.num_pages > 1 %}
-            <nav class="flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-text-muted">
-                <div>
-                    Page {{ blog_posts.number }} of {{ blog_posts.paginator.num_pages }}
-                </div>
-                <div class="flex gap-3">
-                    {% if blog_posts.has_previous %}
-                    <a class="ky-button-secondary" href="?page={{ blog_posts.previous_page_number }}{% if active_filters.year %}&year={{ active_filters.year }}{% endif %}{% if active_filters.month %}&month={{ active_filters.month }}{% endif %}{% if active_filters.series %}&series={{ active_filters.series }}{% endif %}">Previous</a>
-                    {% endif %}
-                    {% if blog_posts.has_next %}
-                    <a class="ky-button-secondary" href="?page={{ blog_posts.next_page_number }}{% if active_filters.year %}&year={{ active_filters.year }}{% endif %}{% if active_filters.month %}&month={{ active_filters.month }}{% endif %}{% if active_filters.series %}&series={{ active_filters.series }}{% endif %}">Next</a>
-                    {% endif %}
-                </div>
-            </nav>
-            {% endif %}
-        </section>
+          </nav>
+        {% endif %}
+      </section>
     </section>
-</main>
+  </main>
 
-{% if map_points %}
-{{ map_points|json_script:"blog-map-points" }}
-<section class="fixed inset-0 z-50 hidden bg-text/80 p-4" data-blog-map-overlay>
-    <div class="mx-auto grid h-full max-w-7xl gap-4 rounded-2xl bg-bg p-4 shadow-card lg:grid-cols-[minmax(0,1fr)_24rem]">
+  {% if map_points %}
+    {{ map_points|json_script:"blog-map-points" }}
+    <section class="fixed inset-0 z-50 hidden bg-text/80 p-4"
+             data-blog-map-overlay>
+      <div class="mx-auto grid h-full max-w-7xl gap-4 rounded-2xl bg-bg p-4 shadow-card lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div class="flex min-h-[24rem] flex-col gap-4 rounded-xl border border-border bg-surface p-4">
-            <div class="flex items-center justify-between">
-                <h2 class="text-2xl font-display text-text">Map</h2>
-                <button type="button" class="ky-button-secondary" data-blog-map-close>Close</button>
-            </div>
-            <div class="relative flex-1 overflow-hidden rounded-xl border border-border-strong bg-bg-soft">
-                <div class="h-full min-h-[24rem] w-full" data-blog-map-canvas></div>
-            </div>
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-display text-text">Kort</h2>
+            <button type="button" class="ky-button-secondary" data-blog-map-close>Loka</button>
+          </div>
+          <div class="relative flex-1 overflow-hidden rounded-xl border border-border-strong bg-bg-soft">
+            <div class="h-full min-h-[24rem] w-full" data-blog-map-canvas></div>
+          </div>
         </div>
         <aside class="overflow-y-auto rounded-xl border border-border bg-surface p-4">
-            <h3 class="mb-4 text-lg font-display text-text">Geotagged posts</h3>
-            <div class="space-y-4" data-blog-map-list></div>
+          <h3 class="mb-4 text-lg font-display text-text">Færslur merktar á kort</h3>
+          <div class="space-y-4" data-blog-map-list></div>
         </aside>
-    </div>
-</section>
-{% endif %}
+      </div>
+    </section>
+  {% endif %}
 {% endblock %}
 
 {% block extra_js %}
-{{ block.super }}
-{% if map_points %}
-<script
-  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-  crossorigin=""
-></script>
-<script>
+  {{ block.super }}
+  {% if map_points %}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    <script>
   (() => {
     const openButton = document.querySelector("[data-blog-map-toggle]");
     const overlay = document.querySelector("[data-blog-map-overlay]");
@@ -250,6 +252,6 @@
       }
     });
   })();
-</script>
-{% endif %}
+    </script>
+  {% endif %}
 {% endblock %}
