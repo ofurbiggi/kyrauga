@@ -114,6 +114,9 @@
   .ky-prose p {
     @apply mb-6;
   }
+  .ky-prose .block-image {
+    @apply my-10;
+  }
 }
 
 /* Example: keep existing hero styles via a class */
