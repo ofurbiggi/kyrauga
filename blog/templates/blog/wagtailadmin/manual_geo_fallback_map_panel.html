@@ -1,0 +1,47 @@
+{% load i18n %}
+
+<section class="kyrauga-image-map" data-kyrauga-coordinate-map-wrapper>
+    <div class="kyrauga-image-map__header">
+        <h2 class="w-label-3">{% trans "Fallback location" %}</h2>
+        <a
+            href="#"
+            target="_blank"
+            rel="noreferrer"
+            class="button button-small button-secondary disabled"
+            data-kyrauga-coordinate-target="open-map-link"
+            aria-disabled="true"
+        >
+            {% trans "Open in OpenStreetMap" %}
+        </a>
+    </div>
+    <p class="kyrauga-image-map__help">
+        {% if featured_image_has_gps %}
+            {% trans "This marker only sets the manual fallback. The featured image GPS coordinates currently take priority on the public page." %}
+        {% else %}
+            {% trans "Click to place the marker, drag it to adjust the fallback location, or type coordinates above." %}
+        {% endif %}
+    </p>
+    <div class="kyrauga-image-map__search" data-kyrauga-coordinate-search>
+        <label class="w-sr-only" for="{{ self.prefix }}-location-search">{% trans "Search for an approximate location" %}</label>
+        <input
+            id="{{ self.prefix }}-location-search"
+            type="search"
+            class="w-field__input"
+            placeholder="{% trans 'Search for a place' %}"
+            autocomplete="off"
+            data-kyrauga-coordinate-target="search-input"
+        >
+        <button type="button" class="button button-small button-secondary" data-kyrauga-coordinate-target="search-button">
+            {% trans "Search" %}
+        </button>
+        <p class="kyrauga-image-map__search-status" data-kyrauga-coordinate-target="search-status" aria-live="polite"></p>
+    </div>
+    <div
+        class="kyrauga-image-map__frame"
+        data-kyrauga-coordinate-map
+        data-latitude="{{ latitude }}"
+        data-longitude="{{ longitude }}"
+        data-latitude-input="[name='manual_latitude']"
+        data-longitude-input="[name='manual_longitude']"
+    ></div>
+</section>
