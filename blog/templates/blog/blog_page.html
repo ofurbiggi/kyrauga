@@ -178,19 +178,19 @@
                 {% endif %}
             </section>
 
-            {% if other_posts %}
-                <section class="mx-auto flex max-w-7xl flex-col gap-5 px-6 pb-20 md:px-8 lg:px-12">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-2xl font-display text-text">Fleiri færslur</h2>
-                        <span class="text-sm text-text-muted">{{ other_posts|length }} í tímaröð</span>
-                    </div>
-                    <div class="grid gap-4 sm:gap-2 sm:grid-cols-2 md:grid-cols-3">
-                        {% for blog_post in other_posts %}
-                            {% include "blog/includes/blog_page_card.html" %}
-                        {% endfor %}
-                    </div>
-                </section>
-            {% endif %}
+
         </article>
+        {% if other_posts %}
+            <section class="mx-auto flex max-w-7xl flex-col gap-5 px-6 pb-20 md:px-8 lg:px-12">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-display text-text">Fleiri færslur</h2>
+                </div>
+                <div class="grid gap-4 sm:gap-2 sm:grid-cols-2 md:grid-cols-3">
+                    {% for blog_post in other_posts %}
+                        {% include "blog/includes/blog_page_card.html" %}
+                    {% endfor %}
+                </div>
+            </section>
+        {% endif %}
     </main>
 {% endblock %}
