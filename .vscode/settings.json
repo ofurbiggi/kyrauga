@@ -1,0 +1,13 @@
+{
+  "files.associations": {
+    "**/templates/**/*.html": "django-html"
+  },
+  "[django-html]": {
+    "editor.defaultFormatter": "monosans.djlint",
+    "editor.formatOnSave": true
+  },
+  "emmet.includeLanguages": {
+    "django-html": "html"
+  },
+  "djlint.showInstallError": false
+}

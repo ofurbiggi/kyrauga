@@ -10,7 +10,19 @@ from wagtail.models import Orderable
 
 
 class HomePage(Page):
-    pass
+    def get_context(self, request, *args, **kwargs):
+        context = super().get_context(request, *args, **kwargs)
+        from blog.models import BlogIndexPage
+
+        blog_index_page = (
+            BlogIndexPage.objects.child_of(self)
+            .live()
+            .public()
+            .first()
+        )
+        context["blog_index_page"] = blog_index_page
+        context["pinned_items"] = blog_index_page.get_pinned_items() if blog_index_page else []
+        return context
 
 
 @register_setting

@@ -352,6 +352,32 @@ class BlogPage(Page):
     def has_location(self):
         return self.resolved_latitude is not None and self.resolved_longitude is not None
 
+    @staticmethod
+    def _format_coordinate(value, positive_hemisphere, negative_hemisphere):
+        coordinate = float(value)
+        hemisphere = positive_hemisphere if coordinate >= 0 else negative_hemisphere
+        absolute_coordinate = abs(coordinate)
+        degrees = int(absolute_coordinate)
+        minutes = round((absolute_coordinate - degrees) * 60)
+        if minutes == 60:
+            degrees += 1
+            minutes = 0
+        return f"{degrees}{chr(176)}{minutes:02d}'{hemisphere}"
+
+    @property
+    def photo_taken_at(self):
+        if not self.featured_image or self.featured_image.taken_at is None:
+            return ""
+        return self.featured_image.taken_at
+
+    @property
+    def coordinates_display(self):
+        if not self.has_location:
+            return ""
+        latitude = self._format_coordinate(self.resolved_latitude, "N", "S")
+        longitude = self._format_coordinate(self.resolved_longitude, "E", "W")
+        return f"{latitude} x {longitude}"
+
     @property
     def aperture_display(self):
         if not self.featured_image or self.featured_image.aperture is None:
@@ -366,9 +392,25 @@ class BlogPage(Page):
 
     @property
     def exposure_display(self):
-        if not self.featured_image:
+        if not self.featured_image or not self.featured_image.shutter_speed:
             return ""
         return self.featured_image.shutter_speed
+
+    @property
+    def iso_display(self):
+        if not self.featured_image or self.featured_image.iso is None:
+            return ""
+        return str(self.featured_image.iso)
+
+    @property
+    def camera_display(self):
+        if not self.featured_image:
+            return ""
+        return " ".join(
+            value
+            for value in (self.featured_image.camera_make, self.featured_image.camera_model)
+            if value
+        )
 
     @property
     def best_alt_text(self):
@@ -411,12 +453,12 @@ class BlogPage(Page):
             return ""
         latitude = float(self.resolved_latitude)
         longitude = float(self.resolved_longitude)
-        lat_delta = 0.01
-        lon_delta = 0.02
+        lat_delta = 0.1
+        lon_delta = 0.2
         params = urlencode(
             {
                 "bbox": f"{longitude - lon_delta},{latitude - lat_delta},{longitude + lon_delta},{latitude + lat_delta}",
-                "layer": "mapnik",
+                "layer": "shortbread",
                 "marker": f"{latitude},{longitude}",
             }
         )
@@ -449,6 +491,39 @@ class BlogPage(Page):
             related_series = related_series.public()
         return related_series
 
+    def get_other_blog_posts(self):
+        if self.first_published_at is None:
+            return []
+
+        base_queryset = (
+            BlogPage.objects.child_of(self.get_parent())
+            .live()
+            .public()
+            .exclude(pk=self.pk)
+            .select_related("featured_image")
+        )
+        newer_filter = Q(first_published_at__gt=self.first_published_at) | Q(
+            first_published_at=self.first_published_at,
+            pk__gt=self.pk,
+        )
+        older_filter = Q(first_published_at__lt=self.first_published_at) | Q(
+            first_published_at=self.first_published_at,
+            pk__lt=self.pk,
+        )
+
+        newer_posts = list(base_queryset.filter(newer_filter).order_by("first_published_at", "pk")[:3])
+        older_limit = 6 - len(newer_posts) if len(newer_posts) < 3 else 3
+        older_posts = list(base_queryset.filter(older_filter).order_by("-first_published_at", "-pk")[:older_limit])
+
+        if len(older_posts) < older_limit:
+            newer_limit = 6 - len(older_posts)
+            if newer_limit > len(newer_posts):
+                newer_posts = list(
+                    base_queryset.filter(newer_filter).order_by("first_published_at", "pk")[:newer_limit]
+                )
+
+        return [*reversed(newer_posts), *older_posts]
+
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         og_image_url = ""
@@ -459,6 +534,7 @@ class BlogPage(Page):
         context.update(
             {
                 "related_series": self.get_related_series_for_display(),
+                "other_posts": self.get_other_blog_posts(),
                 "og_image_url": og_image_url,
             }
         )

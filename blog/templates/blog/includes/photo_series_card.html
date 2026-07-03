@@ -1,28 +1,45 @@
 {% load wagtailimages_tags %}
 
-<article class="overflow-hidden rounded-[1.5rem] border border-border bg-surface-muted shadow-soft">
-    <a href="{{ series_page.url }}" class="grid gap-0 md:grid-cols-[16rem_minmax(0,1fr)]">
-        <div class="bg-bg-soft">
+<article class="group transition duration-200 rounded-full aspect-square">
+    <a href="{{ series_page.url }}"
+       class="block relative group w-full h-full">
+        <div class="absolute inset-[8%] overflow-hidden rounded-full object-cover transition-all drop-shadow-2xl z-10">
             {% if series_page.cover_image %}
-                {% image series_page.cover_image fill-900x900 as series_image %}
-                <img src="{{ series_image.url }}" alt="{{ series_page.title }}" class="h-full w-full object-cover">
+                {% image series_page.cover_image fill-900x900-c100 as series_image %}
+                <img src="{{ series_image.url }}"
+                     alt="{{ series_page.title }}"
+                     class="absolute inset-0 h-full w-full object-cover">
             {% else %}
-                <div class="flex h-full min-h-64 items-center justify-center px-6 text-center text-text-muted">Series</div>
+                <div class="absolute inset-0 h-full w-full object-cover bg-brand-soft">
+                    <p class="sr-only">{{ series_page.title }}</p>
+                </div>
             {% endif %}
         </div>
-        <div class="flex flex-col justify-between gap-4 p-5">
-            <div class="space-y-3">
-                {% if pinned %}
-                <span class="ky-badge">Pinned series</span>
-                {% endif %}
-                <h3 class="text-2xl font-display text-text">{{ series_page.title }}</h3>
-                {% if series_page.intro %}
-                <div class="line-clamp-4 text-sm leading-7 text-text-muted">{{ series_page.intro|striptags }}</div>
-                {% endif %}
-            </div>
-            <p class="text-sm font-semibold uppercase tracking-[0.12em] text-text-muted">
-                {{ series_page.connected_posts_count }} posts
-            </p>
+        <div class="rounded-full absolute inset-[8%] bg-bg-soft translate-y-12 translate-x-6 scale-[.85] group-hover:scale-[.92] transition-all drop-shadow-lg">
         </div>
+        <div class="rounded-full absolute inset-[8%] bg-bg-soft translate-y-8 translate-x-4 scale-90 group-hover:scale-95 transition-all drop-shadow-lg">
+        </div>
+        <div class="rounded-full absolute inset-[8%] bg-bg translate-y-4 translate-x-2 scale-95 group-hover:scale-[.98] transition-all drop-shadow-lg">
+        </div>
+        <svg class="pointer-events-none absolute inset-0 z-10 h-full w-full text-text font-display"
+             viewBox="-24 -24 348 348"
+             aria-hidden="true"
+             focusable="false">
+            <defs>
+            <path id="blog-card-circle-path-{{ series_page.id }}" d="M 150,156 m -160,0 a 160,160 0 1,1 320,0 a 160,160 0 1,1 -320,0" />
+            <path id="blog-card-bottom-path-{{ series_page.id }}" d="M -10,150 a 160,160 0 0,0 320,0" />
+            <path id="blog-card-left-path-{{ series_page.id }}" d="M 150,156 m -160,0 a 160,160 0 1,1 320,0 a 160,160 0 1,1 -320,0" />
+            </defs>
+            <text fill="currentColor" font-size="13" font-weight="700" letter-spacing="3.6">
+            <textPath href="#blog-card-circle-path-{{ series_page.id }}" startOffset="15%" text-anchor="start">
+            {{ series_page.title }}
+            </textPath>
+            </text>
+            <text fill="#66f1d2" font-size="13" font-weight="700" letter-spacing="3.6">
+            <textPath href="#blog-card-left-path-{{ series_page.id }}" startOffset="8%" text-anchor="start">
+            Sería
+            </textPath>
+            </text>
+        </svg>
     </a>
 </article>

@@ -5,11 +5,10 @@
 {% block body_class %}template-homepage{% endblock %}
 
 {% block content %}
-
-
-<div class="front-content">
-    <div class="title ky-title">Kýrauga</div>
-    <!-- <div class="gradient-overlay-from-bottom"></div> -->
-</div>
-<!-- <div class="flex h-24"></div> -->
+    <div class="front-content -mb-64">
+        <div class="title ky-title">Kýrauga</div>
+        <div class="gradient-overlay-from-bottom"></div>
+    </div>
+    {% include "blog/includes/pinned_items_carousel.html" with pinned_items=pinned_items has_wrapper=False %}
+    <div class="flex h-24"></div>
 {% endblock content %}
