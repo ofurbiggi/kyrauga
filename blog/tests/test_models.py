@@ -3,9 +3,11 @@ from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 from wagtail.models import Page, Site
@@ -359,6 +361,37 @@ class BlogPageModelTests(TestCase):
         with self.assertRaises(ValidationError):
             page.clean()
 
+    def test_admin_page_renders_manual_geo_map_and_existing_coordinates(self):
+        user_model = get_user_model()
+        user = user_model.objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password123",
+        )
+        self.client.force_login(user)
+        page = self.make_blog_page(
+            title="Mapped admin post",
+            slug="mapped-admin-post",
+            manual_latitude=Decimal("64.146600"),
+            manual_longitude=Decimal("-21.942600"),
+        )
+
+        response = self.client.get(reverse("wagtailadmin_pages:edit", args=[page.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "leaflet.js")
+        self.assertContains(response, 'data-kyrauga-coordinate-map')
+        self.assertContains(response, 'data-latitude="64.146600"')
+        self.assertContains(response, 'data-longitude="-21.942600"')
+        self.assertContains(response, "data-latitude-input")
+        self.assertContains(response, "data-longitude-input")
+        self.assertContains(response, 'data-kyrauga-coordinate-search')
+        self.assertContains(response, 'data-kyrauga-coordinate-target="search-input"')
+        self.assertContains(response, 'type="button"')
+        self.assertContains(response, 'data-kyrauga-coordinate-target="search-button"')
+        self.assertContains(response, "manual_latitude")
+        self.assertContains(response, 'data-kyrauga-coordinate-target="latitude"')
+
 
 class BlogMapStaticAssetTests(TestCase):
     def test_admin_map_script_uses_canonical_osm_tile_url_and_referrer_policy(self):
@@ -366,5 +399,7 @@ class BlogMapStaticAssetTests(TestCase):
         script = script_path.read_text(encoding="utf-8")
 
         self.assertIn("https://tile.openstreetmap.org/{z}/{x}/{y}.png", script)
+        self.assertIn("https://nominatim.openstreetmap.org/search", script)
+        self.assertIn("fitBounds", script)
         self.assertIn('referrerPolicy: "strict-origin-when-cross-origin"', script)
         self.assertNotIn("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", script)

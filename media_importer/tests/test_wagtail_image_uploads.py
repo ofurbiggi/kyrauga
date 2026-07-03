@@ -350,6 +350,10 @@ class WagtailImageAdminMetadataEditingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "leaflet.js")
         self.assertContains(response, 'data-kyrauga-gps-map')
+        self.assertContains(response, 'data-kyrauga-coordinate-search')
+        self.assertContains(response, 'data-kyrauga-coordinate-target="search-input"')
+        self.assertContains(response, 'type="button"')
+        self.assertContains(response, 'data-kyrauga-coordinate-target="search-button"')
         self.assertContains(response, 'data-latitude="65.683530"')
         self.assertContains(response, 'data-longitude="-18.087800"')
         self.assertEqual(response.headers.get("Referrer-Policy"), "strict-origin-when-cross-origin")
@@ -370,5 +374,7 @@ class WagtailImageAdminMetadataEditingTests(TestCase):
         script = script_path.read_text(encoding="utf-8")
 
         self.assertIn("https://tile.openstreetmap.org/{z}/{x}/{y}.png", script)
+        self.assertIn("https://nominatim.openstreetmap.org/search", script)
+        self.assertIn("fitBounds", script)
         self.assertIn('referrerPolicy: "strict-origin-when-cross-origin"', script)
         self.assertNotIn("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", script)

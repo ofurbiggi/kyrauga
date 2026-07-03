@@ -93,7 +93,7 @@
         </div>
     </section>
 
-    <section class="kyrauga-image-map">
+    <section class="kyrauga-image-map" data-kyrauga-coordinate-map-wrapper>
         <div class="kyrauga-image-map__header">
             <h2 class="w-label-3">{% trans "Capture location" %}</h2>
             <a
@@ -110,6 +110,21 @@
         <p class="kyrauga-image-map__help">
             {% trans "Click to place the marker, drag it to adjust the location, or type coordinates above." %}
         </p>
+        <div class="kyrauga-image-map__search" data-kyrauga-coordinate-search>
+            <label class="w-sr-only" for="image-location-search">{% trans "Search for an approximate location" %}</label>
+            <input
+                id="image-location-search"
+                type="search"
+                class="w-field__input"
+                placeholder="{% trans 'Search for a place' %}"
+                autocomplete="off"
+                data-kyrauga-coordinate-target="search-input"
+            >
+            <button type="button" class="button button-small button-secondary" data-kyrauga-coordinate-target="search-button">
+                {% trans "Search" %}
+            </button>
+            <p class="kyrauga-image-map__search-status" data-kyrauga-coordinate-target="search-status" aria-live="polite"></p>
+        </div>
         <div
             class="kyrauga-image-map__frame"
             data-kyrauga-gps-map

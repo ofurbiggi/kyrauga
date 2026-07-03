@@ -1,6 +1,7 @@
 from decimal import Decimal
 from urllib.parse import urlencode
 
+from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
@@ -13,7 +14,7 @@ from modelcluster.contrib.taggit import ClusterTaggableManager
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
 from taggit.models import TaggedItemBase
 from wagtail import blocks
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel, Panel
 from wagtail.blocks import RichTextBlock
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
@@ -271,6 +272,41 @@ class PhotoSeriesPage(Page):
         return context
 
 
+class ManualGeoFallbackMapPanel(Panel):
+    class BoundPanel(Panel.BoundPanel):
+        template_name = "blog/wagtailadmin/manual_geo_fallback_map_panel.html"
+
+        class Media:
+            css = {
+                "all": (
+                    "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+                )
+            }
+            js = (
+                "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+                "js/kyrauga-image-metadata-map.js",
+            )
+
+        def get_context_data(self, parent_context=None):
+            context = super().get_context_data(parent_context)
+            latitude = self.form["manual_latitude"].value()
+            longitude = self.form["manual_longitude"].value()
+            featured_image = getattr(self.instance, "featured_image", None)
+
+            context.update(
+                {
+                    "latitude": latitude or "",
+                    "longitude": longitude or "",
+                    "featured_image_has_gps": bool(
+                        featured_image
+                        and featured_image.gps_latitude is not None
+                        and featured_image.gps_longitude is not None
+                    ),
+                }
+            )
+            return context
+
+
 class BlogPage(Page):
     featured_image = models.ForeignKey(
         get_image_model_string(),
@@ -313,8 +349,25 @@ class BlogPage(Page):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("manual_latitude"),
-                FieldPanel("manual_longitude"),
+                FieldPanel(
+                    "manual_latitude",
+                    widget=forms.NumberInput(
+                        attrs={
+                            "step": "any",
+                            "data-kyrauga-coordinate-target": "latitude",
+                        }
+                    ),
+                ),
+                FieldPanel(
+                    "manual_longitude",
+                    widget=forms.NumberInput(
+                        attrs={
+                            "step": "any",
+                            "data-kyrauga-coordinate-target": "longitude",
+                        }
+                    ),
+                ),
+                ManualGeoFallbackMapPanel(),
             ],
             heading="Manual geo fallback",
         ),

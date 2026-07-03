@@ -27,16 +27,43 @@
     );
   }
 
-  function initializeMap() {
-    var mapElement = document.querySelector("[data-kyrauga-gps-map]");
-    var latitudeInput = document.querySelector('[data-kyrauga-gps-target="latitude"]');
-    var longitudeInput = document.querySelector('[data-kyrauga-gps-target="longitude"]');
+  function buildSearchUrl(query) {
+    return (
+      "https://nominatim.openstreetmap.org/search?" +
+      new URLSearchParams({
+        q: query,
+        format: "jsonv2",
+        limit: 1,
+      }).toString()
+    );
+  }
+
+  function findInput(mapElement, coordinateName) {
+    var selector = mapElement.dataset[coordinateName + "Input"];
+
+    if (selector) {
+      return document.querySelector(selector);
+    }
+
+    return document.querySelector('[data-kyrauga-coordinate-target="' + coordinateName + '"]') ||
+      document.querySelector('[data-kyrauga-gps-target="' + coordinateName + '"]');
+  }
+
+  function initializeMap(mapElement) {
+    var latitudeInput = findInput(mapElement, "latitude");
+    var longitudeInput = findInput(mapElement, "longitude");
 
     if (!mapElement || !latitudeInput || !longitudeInput || typeof L === "undefined") {
       return;
     }
 
-    var openMapLink = document.querySelector('[data-kyrauga-gps-target="open-map-link"]');
+    var mapWrapper = mapElement.closest("[data-kyrauga-coordinate-map-wrapper]") || document;
+    var openMapLink = mapWrapper.querySelector('[data-kyrauga-coordinate-target="open-map-link"]') ||
+      mapWrapper.querySelector('[data-kyrauga-gps-target="open-map-link"]');
+    var searchContainer = mapWrapper.querySelector("[data-kyrauga-coordinate-search]");
+    var searchInput = mapWrapper.querySelector('[data-kyrauga-coordinate-target="search-input"]');
+    var searchButton = mapWrapper.querySelector('[data-kyrauga-coordinate-target="search-button"]');
+    var searchStatus = mapWrapper.querySelector('[data-kyrauga-coordinate-target="search-status"]');
     var defaultCenter = [64.9631, -19.0208];
     var latitude = parseCoordinate(mapElement.dataset.latitude || latitudeInput.value);
     var longitude = parseCoordinate(mapElement.dataset.longitude || longitudeInput.value);
@@ -112,15 +139,102 @@
       setMarker(nextLatitude, nextLongitude, false);
     }
 
+    function setSearchStatus(message) {
+      if (searchStatus) {
+        searchStatus.textContent = message;
+      }
+    }
+
+    function fitSearchResult(result) {
+      if (Array.isArray(result.boundingbox) && result.boundingbox.length === 4) {
+        var south = parseCoordinate(result.boundingbox[0]);
+        var north = parseCoordinate(result.boundingbox[1]);
+        var west = parseCoordinate(result.boundingbox[2]);
+        var east = parseCoordinate(result.boundingbox[3]);
+
+        if (isValidLatitude(south) && isValidLatitude(north) && isValidLongitude(west) && isValidLongitude(east)) {
+          map.fitBounds([[south, west], [north, east]], {
+            maxZoom: 13,
+            padding: [32, 32],
+          });
+          return;
+        }
+      }
+
+      var resultLatitude = parseCoordinate(result.lat);
+      var resultLongitude = parseCoordinate(result.lon);
+
+      if (isValidLatitude(resultLatitude) && isValidLongitude(resultLongitude)) {
+        map.setView([resultLatitude, resultLongitude], 12);
+      }
+    }
+
+    function searchApproximateLocation(query) {
+      setSearchStatus("Searching...");
+
+      fetch(buildSearchUrl(query), {
+        headers: {
+          Accept: "application/json",
+        },
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("Location search failed.");
+          }
+          return response.json();
+        })
+        .then(function (results) {
+          if (!Array.isArray(results) || !results.length) {
+            setSearchStatus("No matching place found.");
+            return;
+          }
+
+          fitSearchResult(results[0]);
+          setSearchStatus("Map moved to the approximate location.");
+        })
+        .catch(function () {
+          setSearchStatus("Location search is unavailable.");
+        });
+    }
+
+    function runSearch(event) {
+      if (event) {
+        event.preventDefault();
+      }
+
+      var query = searchInput.value.trim();
+      if (!query) {
+        setSearchStatus("Enter a place to search for.");
+        return;
+      }
+
+      searchApproximateLocation(query);
+    }
+
+    if (searchContainer && searchInput && searchButton) {
+      searchButton.addEventListener("click", runSearch);
+      searchInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          runSearch(event);
+        }
+      });
+    }
+
     latitudeInput.addEventListener("input", syncMarkerFromInputs);
     longitudeInput.addEventListener("input", syncMarkerFromInputs);
 
     setMarker(latitude, longitude, false);
   }
 
+  function initializeMaps() {
+    var mapElements = document.querySelectorAll("[data-kyrauga-coordinate-map], [data-kyrauga-gps-map]");
+
+    mapElements.forEach(initializeMap);
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initializeMap);
+    document.addEventListener("DOMContentLoaded", initializeMaps);
   } else {
-    initializeMap();
+    initializeMaps();
   }
 })();
