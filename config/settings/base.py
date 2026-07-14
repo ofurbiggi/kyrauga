@@ -93,12 +93,15 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "config.context_processors.analytics",
             ],
         },
     },
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+
+GA_MEASUREMENT_ID = os.getenv("GA_MEASUREMENT_ID", "G-F8Q4JPW7Y0")
 
 
 # Database

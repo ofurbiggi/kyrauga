@@ -39,6 +39,16 @@
         <meta name="apple-mobile-web-app-title" content="Kýrauga" />
         <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}" />
 
+        {% if ga_measurement_id %}
+            <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
+            <script>
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '{{ ga_measurement_id }}');
+            </script>
+        {% endif %}
+
         {# Global stylesheets #}
         <link rel="stylesheet"
               href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
