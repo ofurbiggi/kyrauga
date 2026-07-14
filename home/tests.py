@@ -100,4 +100,4 @@ class NavigationSettingsTests(WagtailPageTestCase):
         response = self.client.get(self.blog_index.url, HTTP_HOST=self.site.hostname)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Navigation items can be added in Settings")
+        self.assertContains(response, "Kýraugað er lokað")
