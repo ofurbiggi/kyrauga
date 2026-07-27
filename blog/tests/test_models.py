@@ -259,14 +259,14 @@ class BlogPageModelTests(TestCase):
 
         self.assertEqual([post.title for post in context["other_posts"]], ["Post 2", "Post 0"])
 
-    def test_index_excludes_pinned_blog_pages_from_automatic_list(self):
+    def test_index_includes_pinned_blog_pages_in_overview_list(self):
         pinned_page = self.make_blog_page(title="Pinned", slug="pinned")
         regular_page = self.make_blog_page(title="Regular", slug="regular")
         BlogIndexPagePinnedItem.objects.create(page=self.index_page, target_page=pinned_page)
 
         context = self.get_index_context()
 
-        self.assertEqual(list(context["blog_posts"].object_list), [regular_page])
+        self.assertCountEqual(list(context["blog_posts"].object_list), [pinned_page, regular_page])
         self.assertEqual(list(context["pinned_items"]), [self.index_page.pinned_items.first()])
 
     def test_index_pagination_uses_twenty_items_per_page(self):

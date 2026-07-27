@@ -1,4 +1,4 @@
-{% load wagtailimages_tags %}
+{% load wagtailcore_tags wagtailimages_tags %}
 
 {% if pinned_items %}
   {% if has_wrapper|default_if_none:True %}
@@ -48,6 +48,14 @@
                     data-pinned-carousel-next>
               <span aria-hidden="true">&rarr;</span>
             </button>
+          </div>
+        {% endif %}
+        {% if blog_index_page %}
+          <div class="mt-4 flex justify-center">
+            <a href="{% pageurl blog_index_page %}"
+               class="text-sm font-semibold uppercase tracking-[0.16em] text-text transition hover:text-brand focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-4 focus:ring-offset-brand-soft">
+              Allar færslur
+            </a>
           </div>
         {% endif %}
       </div>
