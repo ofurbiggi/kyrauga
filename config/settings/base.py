@@ -18,6 +18,21 @@ BASE_DIR = PROJECT_DIR.parent
 
 import os
 
+
+def load_local_env_file(path):
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if key:
+            os.environ.setdefault(key, value)
+
+
 # Load local environment variables when python-dotenv is available.
 # Heroku uses real config vars and does not need python-dotenv during collectstatic.
 try:
@@ -27,6 +42,8 @@ except ImportError:
 
 if load_dotenv is not None:
     load_dotenv(BASE_DIR / ".env.local")
+else:
+    load_local_env_file(BASE_DIR / ".env.local")
 
 
 # Quick-start development settings - unsuitable for production
@@ -102,6 +119,18 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 GA_MEASUREMENT_ID = os.getenv("GA_MEASUREMENT_ID", "G-F8Q4JPW7Y0")
+
+
+# Optional MapTiler style for public website maps. The style URL may include
+# the MapTiler API key, or the key may be supplied separately for SDK use.
+CONTOUR_VECTOR_TILE_CONFIG = {
+    "api_key": os.getenv("MAPTILER_API_KEY", ""),
+    "style_url": os.getenv("CONTOUR_VECTOR_TILE_STYLE_URL", ""),
+    "attribution": os.getenv(
+        "CONTOUR_VECTOR_TILE_ATTRIBUTION",
+        '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a>',
+    ),
+}
 
 
 # Database

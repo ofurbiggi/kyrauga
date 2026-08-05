@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-{% load i18n wagtailcore_tags wagtailimages_tags %}
+{% load i18n static wagtailcore_tags wagtailimages_tags %}
 
-{% block body_class %}template-blog-page{% endblock %}
+{% block body_class %}
+    template-blog-page
+{% endblock body_class %}
 
 {% block meta_tags %}
     {% with seo_desc=page.seo_description %}
@@ -15,11 +17,17 @@
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title" content="{{ page.title }}">
         {% if seo_desc %}<meta name="twitter:description" content="{{ seo_desc }}">{% endif %}
-        {% if og_image_url %}
-            <meta name="twitter:image" content="{{ og_image_url }}"http://127.0.0.1:8000/media/images/20260307-IMG_3533.width-1600.jpg>
-        {% endif %}
+        {% if og_image_url %}<meta name="twitter:image" content="{{ og_image_url }}">{% endif %}
     {% endwith %}
-{% endblock %}
+{% endblock meta_tags %}
+
+{% block extra_css %}
+    {{ block.super }}
+    {% if page.has_location %}
+        <link rel="stylesheet"
+              href="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.css">
+    {% endif %}
+{% endblock extra_css %}
 
 {% block content %}
     <main class="ky-page bg-bg-soft">
@@ -29,6 +37,8 @@
                     {% image page.featured_image width-1600 as hero_image %}
                     <img src="{{ hero_image.url }}"
                          alt="{{ page.best_alt_text }}"
+                         height="{{ hero_image.height }}"
+                         width="{{ hero_image.width }}"
                          class="h-full w-full object-contain">
                     <div class="hidden md:block border-t border-l border-border absolute -top-4 -left-4 w-12 h-12"></div>
                     <div class="hidden md:block border-b border-l border-border absolute -bottom-4 -left-4 w-12 h-12"></div>
@@ -157,11 +167,11 @@
                                            class="relative"><span class="group-hover:opacity-0 opacity-100 absolute right-5 whitespace-nowrap">{{ page.coordinates_display }}</span><span class="absolute right-5 group-hover:opacity-100 opacity-0 whitespace-nowrap">{{ page.resolved_latitude }}, {{ page.resolved_longitude }}</span> <i class="fas fa-expand ml-2"></i></a>
                                     </dd>
                                 </div>
-                                <iframe src="{{ page.map_embed_url }}"
-                                        class="h-72 w-full"
-                                        loading="lazy"
-                                        referrerpolicy="no-referrer-when-downgrade"
-                                        title="Map showing this post location"></iframe>
+                                {{ map_point|json_script:"blog-post-map-point" }}
+                                {{ map_config|json_script:"blog-post-map-config" }}
+                                <div class="h-72 w-full overflow-hidden bg-bg-soft"
+                                     data-blog-post-map-canvas
+                                     aria-label="Map showing this post location"></div>
                             {% endif %}
                         </dl>
                     </section>
@@ -194,3 +204,34 @@
         {% endif %}
     </main>
 {% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    {% if page.has_location %}
+        <script src="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.umd.min.js"></script>
+        <script src="{% static 'js/kyrauga-frontend-map.js' %}"></script>
+        <script>
+        (async () => {
+            const canvas = document.querySelector("[data-blog-post-map-canvas]");
+            const pointNode = document.getElementById("blog-post-map-point");
+            const configNode = document.getElementById("blog-post-map-config");
+            if (!canvas || !pointNode || !window.maptilersdk) {
+                return;
+            }
+
+            const point = JSON.parse(pointNode.textContent);
+            const mapConfig = configNode ? JSON.parse(configNode.textContent) : { style: "openstreetmap", render_style: "openstreetmap" };
+            const map = window.kyraugaFrontendMap.createMap(canvas, mapConfig, {
+                center: [point.longitude, point.latitude],
+                zoom: 10,
+                scrollZoom: false,
+                navigationPosition: "bottom-right",
+            });
+
+            window.kyraugaFrontendMap.addPointMarker(map, point);
+
+            setTimeout(() => map.resize(), 50);
+        })();
+        </script>
+    {% endif %}
+{% endblock extra_js %}

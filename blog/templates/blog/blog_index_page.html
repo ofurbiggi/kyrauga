@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags wagtailimages_tags i18n %}
+{% load static wagtailcore_tags wagtailimages_tags i18n %}
 
 {% block body_class %}
   template-blog-index
@@ -9,9 +9,7 @@
   {{ block.super }}
   {% if map_points %}
     <link rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin="">
+          href="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.css">
   {% endif %}
 {% endblock %}
 
@@ -131,6 +129,7 @@
 
   {% if map_points %}
     {{ map_points|json_script:"blog-map-points" }}
+    {{ map_config|json_script:"blog-map-config" }}
     <section class="fixed inset-0 z-50 hidden bg-text/80 p-4"
              data-blog-map-overlay>
       <div class="mx-auto grid h-full max-w-7xl gap-4 rounded-2xl bg-bg p-4 shadow-card lg:grid-cols-[minmax(0,1fr)_24rem]">
@@ -155,63 +154,52 @@
 {% block extra_js %}
   {{ block.super }}
   {% if map_points %}
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
+    <script src="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.umd.min.js"></script>
+    <script src="{% static 'js/kyrauga-frontend-map.js' %}"></script>
     <script>
-  (() => {
+  (async () => {
     const openButton = document.querySelector("[data-blog-map-toggle]");
     const overlay = document.querySelector("[data-blog-map-overlay]");
     const closeButton = document.querySelector("[data-blog-map-close]");
     const list = document.querySelector("[data-blog-map-list]");
     const canvas = document.querySelector("[data-blog-map-canvas]");
     const dataNode = document.getElementById("blog-map-points");
-    if (!openButton || !overlay || !closeButton || !list || !canvas || !dataNode) {
+    const configNode = document.getElementById("blog-map-config");
+    if (!openButton || !overlay || !closeButton || !list || !canvas || !dataNode || !window.maptilersdk) {
       return;
     }
 
     const points = JSON.parse(dataNode.textContent);
-    if (!Array.isArray(points) || !window.L) {
+    if (!Array.isArray(points)) {
       return;
     }
 
     window.kyraugaBlogMapPoints = points;
+    const mapConfig = configNode ? JSON.parse(configNode.textContent) : { style: "openstreetmap", render_style: "openstreetmap" };
 
-    const map = L.map(canvas, {
-      zoomControl: true,
-      scrollWheelZoom: true,
+    const map = window.kyraugaFrontendMap.createMap(canvas, mapConfig, {
+      center: points.length ? [points[0].longitude, points[0].latitude] : [0, 0],
+      zoom: 10,
+      scrollZoom: true,
+      navigationPosition: "bottom-right",
     });
 
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-      referrerPolicy: "strict-origin-when-cross-origin",
-    }).addTo(map);
-
     const markers = [];
-    const bounds = [];
 
     list.innerHTML = "";
     points.forEach((point) => {
       const popupImage = point.thumbnail
         ? `<img src="${point.thumbnail}" alt="" class="mb-2 h-24 w-full rounded-md object-cover">`
         : "";
-      const marker = L.circleMarker([point.latitude, point.longitude], {
-        radius: 8,
-        color: "#1f3f7a",
-        weight: 2,
-        fillColor: "#66f1d2",
-        fillOpacity: 0.9,
-      }).addTo(map);
-      marker.bindPopup(`
+      const marker = window.kyraugaFrontendMap.addPointMarker(map, point, {
+        popupHtml: (popupPoint) => `
         <div class="w-48">
           ${popupImage}
-          <a href="${point.url}" class="block font-semibold text-secondary-strong">${point.title}</a>
-          <p class="mt-1 text-sm text-slate-600">${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</p>
-        </div>
-      `);
+          <a href="${popupPoint.url}" class="block font-semibold text-secondary-strong">${popupPoint.title}</a>
+          <p class="mt-1 text-sm text-slate-600">${popupPoint.latitude.toFixed(5)}, ${popupPoint.longitude.toFixed(5)}</p>
+        </div>`,
+      });
       markers.push(marker);
-      bounds.push([point.latitude, point.longitude]);
 
       const item = document.createElement("article");
       item.className = "rounded-lg border border-border bg-bg-soft p-3";
@@ -220,29 +208,29 @@
         <p class="mt-1 text-sm text-text-muted">${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</p>
       `;
       item.addEventListener("mouseenter", () => {
-        marker.openPopup();
-        map.flyTo([point.latitude, point.longitude], Math.max(map.getZoom(), 9), {
-          duration: 0.5,
+        window.kyraugaFrontendMap.openMarkerPopup(marker);
+        map.flyTo({
+          center: [point.longitude, point.latitude],
+          zoom: Math.max(map.getZoom(), 9),
+          duration: 500,
         });
       });
-      item.addEventListener("focusin", () => marker.openPopup());
+      item.addEventListener("focusin", () => {
+        window.kyraugaFrontendMap.openMarkerPopup(marker);
+      });
       list.appendChild(item);
     });
 
-    if (bounds.length === 1) {
-      map.setView(bounds[0], 10);
-    } else if (bounds.length > 1) {
-      map.fitBounds(bounds, { padding: [40, 40] });
-    }
+    window.kyraugaFrontendMap.fitToPoints(map, points, { padding: 40, singleZoom: 10 });
 
     let mapInitialized = false;
     openButton.addEventListener("click", () => {
       overlay.classList.remove("hidden");
       if (!mapInitialized) {
         mapInitialized = true;
-        setTimeout(() => map.invalidateSize(), 50);
+        setTimeout(() => map.resize(), 50);
       } else {
-        setTimeout(() => map.invalidateSize(), 50);
+        setTimeout(() => map.resize(), 50);
       }
     });
     closeButton.addEventListener("click", () => overlay.classList.add("hidden"));

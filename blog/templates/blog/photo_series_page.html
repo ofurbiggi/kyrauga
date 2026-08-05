@@ -1,36 +1,64 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags wagtailimages_tags %}
+{% load static wagtailcore_tags wagtailimages_tags %}
 
-{% block body_class %}template-photo-series{% endblock %}
+{% block body_class %}
+    template-photo-series
+{% endblock body_class %}
+
+{% block extra_css %}
+    {{ block.super }}
+    {% if map_points %}
+        <link rel="stylesheet"
+              href="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.css">
+        <style>
+            [data-series-map-wrapper] .maplibregl-control-container {
+                z-index: 10;
+            }
+
+            [data-series-map-wrapper][data-series-map-style="contours"],
+            [data-series-map-wrapper][data-series-map-style="contours"] .maplibregl-canvas {
+                background: #fff;
+            }
+
+        </style>
+    {% endif %}
+{% endblock %}
 
 {% block content %}
-    <main class="ky-page">
-        <section class="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-20 md:px-8 lg:px-12">
-            <header class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end py-20">
-                <div>
-                    <p class="ky-kicker">Ferðalag</p>
-                    <h1 class="ky-title text-4xl md:text-6xl">{{ page.title }}</h1>
-                    {% if page.intro %}
-                        <div class="mt-4 max-w-3xl text-base leading-7 text-text-muted">{{ page.intro|richtext }}</div>
-                    {% endif %}
-                </div>
-                {% if page.cover_image %}
-                    <div class="overflow-hidden rounded-[1.5rem] border border-border bg-surface shadow-soft">
-                        {% image page.cover_image fill-700x500 as cover_image %}
-                        <img src="{{ cover_image.url }}"
-                             alt="{{ page.title }}"
-                             class="h-full w-full object-cover">
-                    </div>
-                {% endif %}
-            </header>
+    <main class="ky-page bg-bg-soft">
+        <section class="flex flex-col gap-8">
+            {% if map_points %}
+                <section class="bg-surface relative isolate mx-auto w-full h-[80vh]"
+                         data-series-map-style="{{ map_config.render_style|default:'openstreetmap' }}"
+                         data-series-map-wrapper>
+                    {{ map_points|json_script:"series-map-points" }}
+                    {{ map_config|json_script:"series-map-config" }}
 
-            {% if page.body %}
-                <section class="prose max-w-none prose-p:text-text prose-strong:text-text">
-                    {{ page.body }}
+                    <div class="relative h-full w-full overflow-hidden {% if map_config.render_style == 'contours' %}bg-white{% else %}bg-bg-soft{% endif %}">
+                        <div class="h-full w-full" data-series-map-canvas></div>
+                    </div>
+                    {% comment %} <div class="absolute top-0 w-full h-40 bg-gradient-to-b from-white to-transparent"></div> {% endcomment %}
                 </section>
             {% endif %}
+            <section class="flex flex-col gap-5 mx-auto max-w-7xl w-full px-6 py-8 md:px-8 lg:px-12 {% if not map_points %}pt-40{% endif %}">
+                <header class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end w-full">
+                    <div>
+                        <p class="ky-kicker">Ferðalag</p>
+                        <h1 class="ky-title text-4xl md:text-6xl">{{ page.title }}</h1>
+                        {% if page.intro %}
+                            <div class="mt-4 max-w-3xl text-base leading-7 text-text-muted">{{ page.intro|richtext }}</div>
+                        {% endif %}
+                    </div>
+                    {% comment %} {% if page.cover_image %}
+                        <div class="overflow-hidden rounded-[1.5rem] border border-border bg-surface shadow-soft">
+                            {% image page.cover_image fill-700x500 as cover_image %}
+                            <img src="{{ cover_image.url }}" alt="{{ page.title }}" height="{{ cover_image.height }}" width="{{ cover_image.width }}" class="h-full w-full object-cover">
+                        </div>
+                    {% endif %} {% endcomment %}
+                </header>
+            </section>
 
-            <section class="flex flex-col gap-5">
+            <section class="flex flex-col gap-5 mx-auto max-w-7xl w-full px-6 py-8 md:px-8 lg:px-12">
                 <div class="flex items-center justify-between">
                     <h2 class="text-2xl font-display text-text-muted">Í þessari seríu</h2>
                     <span class="ky-badge whitespace-nowrap">{{ posts|length }} myndir</span>
@@ -43,6 +71,57 @@
                     {% endfor %}
                 </div>
             </section>
+
+            {% if page.body %}
+                <section class="ky-prose lg:max-w-[37rem] mx-auto px-6 py-20 md:px-8 lg:px-12">
+                    {{ page.body }}
+                </section>
+            {% endif %}
         </section>
     </main>
+{% endblock content %}
+
+{% block extra_js %}
+    {{ block.super }}
+    {% if map_points %}
+        <script src="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.umd.min.js"></script>
+        <script src="{% static 'js/kyrauga-frontend-map.js' %}"></script>
+        <script>
+        (async () => {
+            const canvas = document.querySelector("[data-series-map-canvas]");
+            const dataNode = document.getElementById("series-map-points");
+            const configNode = document.getElementById("series-map-config");
+            if (!canvas || !dataNode || !window.maptilersdk) {
+                return;
+            }
+
+            const points = JSON.parse(dataNode.textContent);
+            if (!Array.isArray(points) || points.length === 0) {
+                return;
+            }
+            const mapConfig = configNode ? JSON.parse(configNode.textContent) : { style: "openstreetmap", render_style: "openstreetmap" };
+
+            const map = window.kyraugaFrontendMap.createMap(canvas, mapConfig, {
+                center: [points[0].longitude, points[0].latitude],
+                zoom: 10,
+                scrollZoom: false,
+                navigationPosition: "bottom-right",
+            });
+
+            points.forEach((point) => {
+                window.kyraugaFrontendMap.addPointMarker(map, point, {
+                    popupHtml: (popupPoint) => `
+                    <div class="">
+                        <a href="${window.kyraugaFrontendMap.escapeHtml(popupPoint.url)}" class="block font-semibold text-center text-secondary-strong">${window.kyraugaFrontendMap.escapeHtml(popupPoint.title)}</a>
+                    </div>`,
+                    clickUrl: (clickedPoint) => clickedPoint.url,
+                });
+            });
+
+            window.kyraugaFrontendMap.fitToPoints(map, points, { padding: 96, singleZoom: 10 });
+
+            setTimeout(() => map.resize(), 50);
+        })();
+        </script>
+    {% endif %}
 {% endblock %}

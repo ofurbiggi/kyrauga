@@ -2,6 +2,7 @@ from decimal import Decimal
 from urllib.parse import urlencode
 
 from django import forms
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
@@ -28,6 +29,25 @@ def format_decimal(value):
         return ""
     normalized = Decimal(value).normalize()
     return format(normalized, "f").rstrip("0").rstrip(".") or "0"
+
+
+MAP_STYLE_OPENSTREETMAP = "openstreetmap"
+MAP_STYLE_CONTOURS = "contours"
+
+
+def get_frontend_map_config(requested_style=MAP_STYLE_CONTOURS):
+    contour_config = getattr(settings, "CONTOUR_VECTOR_TILE_CONFIG", {})
+    contours_configured = bool(contour_config.get("style_url"))
+    render_style = requested_style
+    if render_style == MAP_STYLE_CONTOURS and not contours_configured:
+        render_style = MAP_STYLE_OPENSTREETMAP
+    return {
+        "requested_style": requested_style,
+        "style": requested_style,
+        "render_style": render_style,
+        "contours_configured": contours_configured,
+        "contours": contour_config,
+    }
 
 
 class QuoteBlock(blocks.StructBlock):
@@ -199,6 +219,7 @@ class BlogIndexPage(Page):
                 "pinned_items": pinned_items,
                 "blog_posts": paginated_posts,
                 "map_points": map_points,
+                "map_config": get_frontend_map_config(),
                 "available_filters": self.get_available_filters(self.get_base_blog_pages_queryset()),
                 "active_filters": self.get_filter_state(),
             }
@@ -207,6 +228,13 @@ class BlogIndexPage(Page):
 
 
 class PhotoSeriesPage(Page):
+    MAP_STYLE_OPENSTREETMAP = MAP_STYLE_OPENSTREETMAP
+    MAP_STYLE_CONTOURS = MAP_STYLE_CONTOURS
+    MAP_STYLE_CHOICES = [
+        (MAP_STYLE_OPENSTREETMAP, "OpenStreetMap"),
+        (MAP_STYLE_CONTOURS, "Contours"),
+    ]
+
     intro = RichTextField(blank=True)
     cover_image = models.ForeignKey(
         get_image_model_string(),
@@ -216,6 +244,12 @@ class PhotoSeriesPage(Page):
         related_name="+",
     )
     body = StreamField(BlogBodyBlock(), blank=True, use_json_field=True)
+    map_style = models.CharField(
+        max_length=32,
+        choices=MAP_STYLE_CHOICES,
+        default=MAP_STYLE_CONTOURS,
+        help_text="Choose the visual treatment for this series map.",
+    )
 
     parent_page_types = ["blog.BlogIndexPage"]
     subpage_types = []
@@ -224,6 +258,7 @@ class PhotoSeriesPage(Page):
     content_panels = Page.content_panels + [
         FieldPanel("intro"),
         FieldPanel("cover_image"),
+        FieldPanel("map_style"),
         FieldPanel("body"),
     ]
 
@@ -246,6 +281,31 @@ class PhotoSeriesPage(Page):
     def connected_posts_count(self):
         return self.connected_posts.count()
 
+    def get_map_points(self):
+        points = []
+        for blog_page in self.connected_posts:
+            if not blog_page.has_location:
+                continue
+            thumbnail_url = ""
+            try:
+                thumbnail_url = blog_page.featured_image.get_rendition("fill-200x150").url
+            except Exception:
+                thumbnail_url = ""
+            points.append(
+                {
+                    "title": blog_page.title,
+                    "url": blog_page.url,
+                    "latitude": float(blog_page.resolved_latitude),
+                    "longitude": float(blog_page.resolved_longitude),
+                    "coordinates": blog_page.coordinates_display,
+                    "thumbnail": thumbnail_url,
+                }
+            )
+        return points
+
+    def get_map_config(self):
+        return get_frontend_map_config(self.map_style)
+
     def get_url_parts(self, request=None):
         url_parts = super().get_url_parts(request=request)
         if not url_parts:
@@ -260,6 +320,8 @@ class PhotoSeriesPage(Page):
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         context["posts"] = self.connected_posts
+        context["map_points"] = self.get_map_points()
+        context["map_config"] = self.get_map_config()
         return context
 
 
@@ -382,15 +444,19 @@ class BlogPage(Page):
 
     @property
     def resolved_latitude(self):
+        if self.manual_latitude is not None and self.manual_longitude is not None:
+            return self.manual_latitude
         if self.featured_image and self.featured_image.gps_latitude is not None:
             return self.featured_image.gps_latitude
-        return self.manual_latitude
+        return None
 
     @property
     def resolved_longitude(self):
+        if self.manual_latitude is not None and self.manual_longitude is not None:
+            return self.manual_longitude
         if self.featured_image and self.featured_image.gps_longitude is not None:
             return self.featured_image.gps_longitude
-        return self.manual_longitude
+        return None
 
     @property
     def has_location(self):
@@ -575,11 +641,22 @@ class BlogPage(Page):
             og_image_url = self.featured_image.get_rendition("fill-1200x630").url
         except Exception:
             og_image_url = ""
+        map_point = None
+        if self.has_location:
+            map_point = {
+                "title": self.title,
+                "url": self.url,
+                "latitude": float(self.resolved_latitude),
+                "longitude": float(self.resolved_longitude),
+                "coordinates": self.coordinates_display,
+            }
         context.update(
             {
                 "related_series": self.get_related_series_for_display(),
                 "other_posts": self.get_other_blog_posts(),
                 "og_image_url": og_image_url,
+                "map_point": map_point,
+                "map_config": get_frontend_map_config(),
             }
         )
         return context

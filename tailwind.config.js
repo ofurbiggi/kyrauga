@@ -6,6 +6,7 @@ module.exports = {
     "./search/templates/**/*.html",
     "./config/templates/**/*.html",
     "./home/static/**/*.js",
+    "./config/static/**/*.js",
   ],
   safelist: [
     "ky-page",
@@ -18,6 +19,8 @@ module.exports = {
     "ky-button-secondary",
     "ky-badge",
     "ky-border",
+    "ky-map-marker",
+    "ky-map-minimap",
   ],
   theme: {
     extend: {

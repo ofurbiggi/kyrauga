@@ -6,7 +6,7 @@ from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
@@ -64,8 +64,8 @@ class BlogPageModelTests(TestCase):
         blog_page.save_revision().publish()
         return BlogPage.objects.get(pk=blog_page.pk)
 
-    def make_series(self, title="Series", slug="series"):
-        series_page = PhotoSeriesPage(title=title, slug=slug)
+    def make_series(self, title="Series", slug="series", **kwargs):
+        series_page = PhotoSeriesPage(title=title, slug=slug, **kwargs)
         self.index_page.add_child(instance=series_page)
         series_page.save_revision().publish()
         return PhotoSeriesPage.objects.get(pk=series_page.pk)
@@ -99,7 +99,7 @@ class BlogPageModelTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Served page")
 
-    def test_blog_index_map_response_emits_safe_referrer_policy_and_canonical_tile_config(self):
+    def test_blog_index_map_response_uses_configured_frontend_map_style(self):
         page = self.make_blog_page(
             title="Mapped post",
             slug="mapped-post",
@@ -112,18 +112,27 @@ class BlogPageModelTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Referrer-Policy"), "strict-origin-when-cross-origin")
         self.assertNotEqual(response.headers.get("Referrer-Policy"), "no-referrer")
-        self.assertContains(response, "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
-        self.assertContains(response, 'referrerPolicy: "strict-origin-when-cross-origin"')
+        self.assertContains(response, "blog-map-config")
+        self.assertContains(response, "kyrauga-frontend-map.js")
+        self.assertContains(response, '"render_style": "contours"')
+        self.assertContains(response, "maptiler-sdk-js/v4.0.2")
         self.assertNotContains(response, "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
         self.assertContains(response, page.title)
 
-    def test_resolved_location_prefers_image_geo_metadata(self):
+    def test_resolved_location_prefers_manual_coordinates_over_image_geo_metadata(self):
         image = self.make_image(gps_latitude=Decimal("64.100100"), gps_longitude=Decimal("-21.900200"))
         page = self.make_blog_page(
             featured_image=image,
             manual_latitude=Decimal("63.000000"),
             manual_longitude=Decimal("-20.000000"),
         )
+
+        self.assertEqual(page.resolved_latitude, Decimal("63.000000"))
+        self.assertEqual(page.resolved_longitude, Decimal("-20.000000"))
+
+    def test_resolved_location_uses_image_geo_metadata_without_manual_override(self):
+        image = self.make_image(gps_latitude=Decimal("64.100100"), gps_longitude=Decimal("-21.900200"))
+        page = self.make_blog_page(featured_image=image)
 
         self.assertEqual(page.resolved_latitude, Decimal("64.100100"))
         self.assertEqual(page.resolved_longitude, Decimal("-21.900200"))
@@ -196,6 +205,154 @@ class BlogPageModelTests(TestCase):
         page.save_revision().publish()
 
         self.assertEqual(list(series.connected_posts), [BlogPage.objects.get(pk=page.pk)])
+
+    def test_series_page_map_points_include_only_geo_tagged_posts(self):
+        mapped_page = self.make_blog_page(
+            title="Mapped series post",
+            slug="mapped-series-post",
+            manual_latitude=Decimal("64.146600"),
+            manual_longitude=Decimal("-21.942600"),
+        )
+        unmapped_page = self.make_blog_page(title="Unmapped series post", slug="unmapped-series-post")
+        series = self.make_series()
+        mapped_page.series.add(series)
+        mapped_page.save_revision().publish()
+        unmapped_page.series.add(series)
+        unmapped_page.save_revision().publish()
+
+        points = series.get_map_points()
+
+        self.assertEqual(len(points), 1)
+        self.assertEqual(points[0]["title"], "Mapped series post")
+        self.assertEqual(points[0]["latitude"], 64.1466)
+        self.assertEqual(points[0]["longitude"], -21.9426)
+        self.assertEqual(points[0]["coordinates"], mapped_page.coordinates_display)
+
+    def test_series_page_renders_map_and_all_connected_posts(self):
+        mapped_page = self.make_blog_page(
+            title="Mapped rendered post",
+            slug="mapped-rendered-post",
+            manual_latitude=Decimal("64.146600"),
+            manual_longitude=Decimal("-21.942600"),
+        )
+        unmapped_page = self.make_blog_page(title="Unmapped rendered post", slug="unmapped-rendered-post")
+        series = self.make_series(title="Rendered series", slug="rendered-series")
+        mapped_page.series.add(series)
+        mapped_page.save_revision().publish()
+        unmapped_page.series.add(series)
+        unmapped_page.save_revision().publish()
+
+        response = self.client.get(series.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "series-map-points")
+        self.assertContains(response, '"render_style": "contours"')
+        self.assertContains(response, "kyrauga-frontend-map.js")
+        self.assertContains(response, "maptiler-sdk-js/v4.0.2")
+        self.assertContains(response, "Mapped rendered post")
+        self.assertContains(response, mapped_page.url)
+        self.assertContains(response, unmapped_page.url)
+
+    @override_settings(
+        CONTOUR_VECTOR_TILE_CONFIG={
+            "api_key": "test-token",
+            "style_url": "https://tiles.example.test/maps/custom-style/style.json?key=test-token",
+            "attribution": '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a>',
+        }
+    )
+    def test_series_page_can_opt_into_maptiler_style_url(self):
+        mapped_page = self.make_blog_page(
+            title="Styled mapped post",
+            slug="styled-mapped-post",
+            manual_latitude=Decimal("64.146600"),
+            manual_longitude=Decimal("-21.942600"),
+        )
+        series = self.make_series(
+            title="Styled series",
+            slug="styled-series",
+            map_style=PhotoSeriesPage.MAP_STYLE_CONTOURS,
+        )
+        mapped_page.series.add(series)
+        mapped_page.save_revision().publish()
+
+        response = self.client.get(series.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-series-map-style="contours"')
+        self.assertContains(response, "maptiler-sdk-js/v4.0.2")
+        self.assertContains(response, "https://tiles.example.test/maps/custom-style/style.json?key=test-token")
+        self.assertContains(response, "kyrauga-frontend-map.js")
+        self.assertContains(response, '"render_style": "contours"')
+        self.assertContains(response, '"contours_configured": true')
+        self.assertNotContains(response, "leaflet.vectorgrid@1.3.0")
+        self.assertNotContains(response, "@maplibre/maplibre-gl-leaflet")
+        self.assertNotContains(response, "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+
+    @override_settings(
+        CONTOUR_VECTOR_TILE_CONFIG={
+            "api_key": "",
+            "style_url": "",
+            "attribution": '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a>',
+        }
+    )
+    def test_series_page_contour_style_falls_back_without_style_url(self):
+        mapped_page = self.make_blog_page(
+            title="Contour mapped post",
+            slug="contour-mapped-post",
+            manual_latitude=Decimal("64.146600"),
+            manual_longitude=Decimal("-21.942600"),
+        )
+        series = self.make_series(
+            title="Contour series",
+            slug="contour-series",
+            map_style=PhotoSeriesPage.MAP_STYLE_CONTOURS,
+        )
+        mapped_page.series.add(series)
+        mapped_page.save_revision().publish()
+
+        response = self.client.get(series.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-series-map-style="openstreetmap"')
+        self.assertContains(response, '"style": "contours"')
+        self.assertContains(response, '"render_style": "openstreetmap"')
+        self.assertContains(response, '"contours_configured": false')
+        self.assertContains(response, "maptiler-sdk-js/v4.0.2")
+        self.assertContains(response, "kyrauga-frontend-map.js")
+        self.assertNotContains(response, "leaflet.vectorgrid@1.3.0")
+
+    @override_settings(
+        CONTOUR_VECTOR_TILE_CONFIG={
+            "api_key": "",
+            "style_url": "",
+            "attribution": '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a>',
+        }
+    )
+    def test_series_page_openstreetmap_render_style_falls_back_without_style_url(self):
+        mapped_page = self.make_blog_page(
+            title="Fallback mapped post",
+            slug="fallback-mapped-post",
+            manual_latitude=Decimal("64.146600"),
+            manual_longitude=Decimal("-21.942600"),
+        )
+        series = self.make_series(
+            title="Fallback series",
+            slug="fallback-series",
+            map_style=PhotoSeriesPage.MAP_STYLE_CONTOURS,
+        )
+        mapped_page.series.add(series)
+        mapped_page.save_revision().publish()
+
+        response = self.client.get(series.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-series-map-style="openstreetmap"')
+        self.assertContains(response, '"style": "contours"')
+        self.assertContains(response, '"render_style": "openstreetmap"')
+        self.assertContains(response, '"contours_configured": false')
+        self.assertContains(response, "maptiler-sdk-js/v4.0.2")
+        self.assertContains(response, "kyrauga-frontend-map.js")
+        self.assertNotContains(response, "leaflet.vectorgrid@1.3.0")
 
     def test_unsaved_blog_page_can_hold_series_selection(self):
         first_series = self.make_series(title="North", slug="north")
@@ -394,6 +551,28 @@ class BlogPageModelTests(TestCase):
 
 
 class BlogMapStaticAssetTests(TestCase):
+    def test_frontend_map_script_uses_maptiler_sdk_attribution(self):
+        script_path = Path(__file__).resolve().parents[2] / "config" / "static" / "js" / "kyrauga-frontend-map.js"
+        script = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("new sdk.Map", script)
+        self.assertIn("new sdk.Marker", script)
+        self.assertIn("new sdk.Popup", script)
+        self.assertIn('fa-solid fa-map-pin', script)
+        self.assertIn('anchor: "bottom"', script)
+        self.assertIn("attributionControl: true", script)
+        self.assertIn("geolocateControl: false", script)
+        self.assertIn("ky-map-minimap", script)
+        self.assertIn("maptilerLogo: false", script)
+        self.assertIn('setProperty("bottom", "2rem", "important")', script)
+        self.assertIn('setProperty("top", "auto", "important")', script)
+        self.assertIn("main-map-bounds", script)
+        self.assertNotIn("ky-map-attribution", script)
+        self.assertIn("contourConfig.style_url", script)
+        self.assertNotIn("delete style.projection", script)
+        self.assertNotIn("L.control.attribution", script)
+        self.assertNotIn("VectorGrid", script)
+
     def test_admin_map_script_uses_canonical_osm_tile_url_and_referrer_policy(self):
         script_path = Path(__file__).resolve().parents[2] / "config" / "static" / "js" / "kyrauga-image-metadata-map.js"
         script = script_path.read_text(encoding="utf-8")
