@@ -112,7 +112,7 @@
                 window.kyraugaFrontendMap.addPointMarker(map, point, {
                     popupHtml: (popupPoint) => `
                     <div class="">
-                        <a href="${window.kyraugaFrontendMap.escapeHtml(popupPoint.url)}" class="block font-semibold text-center text-secondary-strong">${window.kyraugaFrontendMap.escapeHtml(popupPoint.title)}</a>
+                        <a href="${window.kyraugaFrontendMap.escapeHtml(popupPoint.url)}" class="ky-hyphenate block font-semibold text-center text-secondary-strong">${window.kyraugaFrontendMap.escapeHtml(popupPoint.title)}</a>
                     </div>`,
                     clickUrl: (clickedPoint) => clickedPoint.url,
                 });

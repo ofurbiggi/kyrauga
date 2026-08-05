@@ -1,7 +1,7 @@
 {% load static wagtailcore_tags wagtailuserbar %}
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="is">
 
     <head>
         <meta charset="utf-8" />
@@ -59,6 +59,10 @@
         <link rel="stylesheet"
               type="text/css"
               href="{% static 'css/kyrauga.css' %}">
+        <script src="{% static 'js/hyphenopoly/Hyphenopoly_Loader.js' %}"></script>
+        <script src="{% static 'js/kyrauga-hyphenation.js' %}"
+                data-hyphenopoly-main-dir="{% static 'js/hyphenopoly/' %}"
+                data-hyphenopoly-pattern-dir="{% static 'js/hyphenopoly/patterns/' %}"></script>
 
         {% block extra_css %}{# Override this in templates to add extra stylesheets #}{% endblock %}
     </head>

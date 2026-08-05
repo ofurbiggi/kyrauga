@@ -96,7 +96,7 @@
                             <h2 class="ky-kicker">Í seríu</h2>
                             <div class="flex flex-wrap gap-3 mt-4">
                                 {% for series in related_series %}
-                                    <a href="{{ series.url }}" class="ky-button-primary">{{ series.title }}</a>
+                                    <a href="{{ series.url }}" class="ky-button-primary ky-hyphenate">{{ series.title }}</a>
                                 {% endfor %}
                             </div>
                         </div>
@@ -181,7 +181,7 @@
                         <h2 class="ky-kicker">Í seríu</h2>
                         <div class="flex flex-wrap gap-3 mt-4">
                             {% for series in related_series %}
-                                <a href="{{ series.url }}" class="ky-button-primary">{{ series.title }}</a>
+                                <a href="{{ series.url }}" class="ky-button-primary ky-hyphenate">{{ series.title }}</a>
                             {% endfor %}
                         </div>
                     </section>

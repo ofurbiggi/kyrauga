@@ -13,6 +13,7 @@ module.exports = {
     "ky-surface",
     "ky-surface-muted",
     "ky-title",
+    "ky-hyphenate",
     "ky-kicker",
     "ky-link",
     "ky-button-primary",

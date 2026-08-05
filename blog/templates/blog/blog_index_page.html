@@ -195,7 +195,7 @@
         popupHtml: (popupPoint) => `
         <div class="w-48">
           ${popupImage}
-          <a href="${popupPoint.url}" class="block font-semibold text-secondary-strong">${popupPoint.title}</a>
+          <a href="${popupPoint.url}" class="ky-hyphenate block font-semibold text-secondary-strong">${popupPoint.title}</a>
           <p class="mt-1 text-sm text-slate-600">${popupPoint.latitude.toFixed(5)}, ${popupPoint.longitude.toFixed(5)}</p>
         </div>`,
       });
@@ -204,7 +204,7 @@
       const item = document.createElement("article");
       item.className = "rounded-lg border border-border bg-bg-soft p-3";
       item.innerHTML = `
-        <a href="${point.url}" class="block font-semibold text-secondary-strong">${point.title}</a>
+        <a href="${point.url}" class="ky-hyphenate block font-semibold text-secondary-strong">${point.title}</a>
         <p class="mt-1 text-sm text-text-muted">${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</p>
       `;
       item.addEventListener("mouseenter", () => {
